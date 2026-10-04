@@ -38,6 +38,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const PASSO = 1;          // 1 unidade de grade por "frente(1)"
 const VEL_MOVE = 1.6;     // unidades / s
 const VEL_GIRO = Math.PI; // rad / s
+// o robô começa de costas para a câmera (olhando para -Z): "frente" afasta ele de quem olha
+const ROT_INICIAL = Math.PI;
 
 // ---------- cena ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -89,11 +91,11 @@ function faceTextura(texto, cor) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshBasicMaterial({ map: t });
 }
-// ordem das faces do BoxGeometry: +X, -X, +Y, -Y, +Z, -Z  (frente do robô = +Z)
+// ordem das faces do BoxGeometry: +X, -X, +Y, -Y, +Z, -Z  (o robô começa olhando para -Z)
 const cuboGizmo = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), [
   faceTextura('DIR', '#e5534b'), faceTextura('ESQ', '#e5534b'),
   faceTextura('CIMA', '#2fa84f'), faceTextura('BAIXO', '#2fa84f'),
-  faceTextura('FRENTE', '#3d7fe0'), faceTextura('TRÁS', '#3d7fe0'),
+  faceTextura('TRÁS', '#3d7fe0'), faceTextura('FRENTE', '#3d7fe0'),
 ]);
 gizmoCena.add(cuboGizmo);
 
@@ -171,7 +173,7 @@ let fila = [], atual = null, indice = -1;
 
 function reiniciar() {
   fila = []; atual = null; indice = -1;
-  robo.position.set(0, 0, 0); robo.rotation.y = 0;
+  robo.position.set(0, 0, 0); robo.rotation.y = ROT_INICIAL;
   rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
 }
 
