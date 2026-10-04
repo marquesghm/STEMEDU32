@@ -37,8 +37,9 @@
   .cadeia{position:absolute;display:flex;align-items:flex-start}
 
   /* paleta */
-  #paleta{flex:0 0 auto;display:flex;gap:2px;overflow-x:auto;padding:8px 8px 12px;background:#ffe9f7;
-    border-top:4px solid #f5c6e6;transition:background .15s}
+  /* paleta: rola deslizando o dedo para os lados (sem barra); bloco só sai puxando para cima */
+  #paleta{flex:0 0 auto;display:flex;gap:2px;overflow:hidden;padding:8px 8px 12px;background:#ffe9f7;
+    border-top:4px solid #f5c6e6;transition:background .15s;touch-action:none}
   #paleta.lixo{background:#ffb3b3}
 
   /* bloco */
@@ -319,7 +320,11 @@ let marcador = null;
 
 document.addEventListener('pointerdown', e => {
   const el = e.target.closest('.bloco');
-  if (!el || e.button > 0) return;
+  if (e.button > 0) return;
+  if (!el) {   // dedo no fundo da paleta: só pode rolar
+    if (paleta.contains(e.target)) arraste = { daPaleta: true, el: null, x0: e.clientX, y0: e.clientY, fantasma: null };
+    return;
+  }
   const r = el.getBoundingClientRect();
   const daPaleta = paleta.contains(el);
   arraste = {
@@ -334,8 +339,15 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('pointermove', e => {
   if (!arraste) return;
   const a = arraste;
+  if (a.rolando) { paleta.scrollLeft = a.sl0 - (e.clientX - a.x0); return; }
   if (!a.fantasma) {
-    if (Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 8) return;
+    const mx = e.clientX - a.x0, my = e.clientY - a.y0;
+    if (Math.hypot(mx, my) < 8) return;
+    // na paleta: puxar para cima pega o bloco; qualquer outro movimento rola a paleta
+    if (a.daPaleta && !(a.el && my < 0 && -my > Math.abs(mx))) {
+      a.rolando = true; a.sl0 = paleta.scrollLeft; a.x0 = e.clientX;
+      return;
+    }
     // arrastar do meio de uma cadeia leva o bloco e todos os seguintes
     a.blocos = a.daPaleta ? [novoBloco(a.tipo)] : cadeias[a.ci].blocos.slice(a.bi);
     a.fantasma = document.createElement('div');
@@ -359,6 +371,7 @@ document.addEventListener('pointerup', e => {
   if (!arraste) return;
   const a = arraste; arraste = null;
   esconderMarcador(); paleta.classList.remove('lixo');
+  if (a.rolando || !a.el) return;          // rolou a paleta (ou tocou no fundo dela)
   if (!a.fantasma) { tocar(a); return; }   // foi só um toque
 
   const fx = parseFloat(a.fantasma.style.left), fy = parseFloat(a.fantasma.style.top);
