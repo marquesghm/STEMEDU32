@@ -79,7 +79,7 @@ Menu ☰ → **Construir cenário** abre `cenario.html`. Terrenos (uma casa cada
 | ⬛ Piso preto | a lâmpada com o robô em cima troca preto ↔ amarelo (até reiniciar) | sim: sensor de piso preto e de piso amarelo |
 
 Bloco laranja **sensor**: chapéu cujos blocos rodam logo que o robô toca no terreno do bloco
-(interrompe o resto do comando atual). Simplificado: um sensor por terreno na paleta.
+(espera o bloco atual terminar; o bloco interrompido pisca, o sensor ganha ⚡ e há uma pausa curta). Simplificado: um sensor por terreno na paleta.
 Avançado: um sensor só, com o terreno na bolinha de baixo (toque abre menu).
 Lua: `function sensor_<terreno>() ... end`.
 

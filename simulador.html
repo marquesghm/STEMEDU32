@@ -362,6 +362,7 @@ function reiniciar() {
   lampada(false);
   apagarPisos();
   estrelasPegas = new Set();
+  pendentes = []; ofsReacao = 0;
   paredeNaFrente = false;   // se já começar de frente para uma parede, o sensor dispara logo no início
   for (const m of Object.values(malhas)) m.visible = true;
   rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
@@ -385,7 +386,14 @@ function verificarFrente() {
   return apareceu;
 }
 
+// Sensores "esperam a vez": o que o robô tocar durante um comando fica guardado e as
+// reações rodam só quando o comando termina (nunca no meio dele), na ordem em que aconteceram.
+let pendentes = [];      // terrenos tocados durante o comando atual
+let ofsReacao = 0;       // comandos de reação já inseridos depois do comando atual
+
 function proximo() {
+  if (pendentes.length) { tocou(pendentes.shift()); return; }
+  ofsReacao = 0;
   if (verificarFrente()) return;   // reação de parede roda antes do próximo comando
   indice++;
   if (indice >= fila.length) { atual = null; parent.postMessage({ tipo: 'fim' }, '*'); return; }
@@ -402,6 +410,8 @@ function proximo() {
     const ang = (cmd === 'esquerda' ? 1 : -1) * n * Math.PI / 2;
     atual = { tipo: 'girar', de: robo.rotation.y, para: robo.rotation.y + ang, t: 0,
               dur: Math.max(0.1, Math.abs(ang) / VEL_GIRO) };
+  } else if (cmd === 'sensor') {       // começo de uma reação: pausa para a criança ver o salto
+    atual = { tipo: 'espera', t: 0, dur: 0.7 };
   } else {
     atual = { tipo: 'espera', t: 0, dur: 0.2 };
   }
@@ -437,14 +447,15 @@ function chegouNaCasa(a) {
     const total = Object.values(cenario).filter(t => t === 'estrela').length;
     if (estrelasPegas.size === total) parent.postMessage({ tipo: 'vitoria' }, '*');
   }
-  if (tipo) { tocou(tipo); return; }
+  if (tipo) pendentes.push(tipo);   // a reação espera o comando terminar
   if (a.restam > 0) andarUmaCasa(a.sentido, a.restam); else proximo();
 }
 
-// pausa e pergunta à página se há reação para esse terreno
+// pausa e pergunta à página se há reação para esse terreno.
+// 'indice' = posição depois da qual a reação entra (após o comando e reações anteriores)
 function tocou(tipo) {
   atual = { tipo: 'aguardando' };
-  parent.postMessage({ tipo: 'tocou', terreno: tipo, indice }, '*');
+  parent.postMessage({ tipo: 'tocou', terreno: tipo, indice: indice + ofsReacao }, '*');
 }
 
 const relogio = new THREE.Clock();
@@ -473,7 +484,7 @@ function animar() {
         parent.postMessage({ tipo: 'caiu' }, '*');
         parent.postMessage({ tipo: 'fim' }, '*');
       }
-      else if (a.tipo === 'luz') { lampada(false); a.trocou ? tocou(a.trocou) : proximo(); }
+      else if (a.tipo === 'luz') { lampada(false); if (a.trocou) pendentes.push(a.trocou); proximo(); }
       else proximo();
     }
   }
@@ -505,7 +516,9 @@ addEventListener('message', ({ data }) => {
   else if (data.tipo === 'reiniciar') reiniciar();
   else if (data.tipo === 'reagir' && atual?.tipo === 'aguardando') {
     // reação entra logo depois do comando atual (o resto do comando atual é interrompido)
-    fila.splice(indice + 1, 0, ...(data.comandos || []));
+    const cmds = data.comandos || [];
+    fila.splice(indice + 1 + ofsReacao, 0, ...cmds);
+    ofsReacao += cmds.length;
     proximo();
   }
   else if (data.tipo === 'ferramenta') escolherFerramenta(data.ferramenta);

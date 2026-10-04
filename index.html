@@ -84,6 +84,13 @@
   body.modo-cenario header, body.modo-cenario #sim, body.modo-cenario #divisor{display:none}
   body.simples .bloco .num{display:none}   /* modo simplificado: sem número */
   body.simples .bloco{height:68px}
+  /* salto para reação: bloco interrompido pisca; sensor disparado ganha brilho laranja e ⚡ */
+  @keyframes piscar{50%{opacity:.25}}
+  .bloco.piscar svg{animation:piscar .35s 3}
+  .bloco.disparou svg{filter:drop-shadow(0 0 7px #ff9d1a) drop-shadow(0 0 7px #ff9d1a)}
+  .bloco.disparou::after{content:"⚡";position:absolute;left:-6px;top:-14px;font-size:24px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+  #minimapa.alerta{animation:piscar .3s 4;border-color:#ff9d1a}
   .bloco.ativo svg{filter:drop-shadow(0 0 6px #00b7ff) drop-shadow(0 0 6px #00b7ff)}
   .bloco.arrastando{opacity:.25}
   .fantasma{position:fixed;transform-origin:0 0;z-index:10;pointer-events:none;opacity:.85;display:flex;align-items:flex-start}
@@ -903,17 +910,36 @@ function paraSim(msg) {
   else simFrame.contentWindow?.postMessage(msg, '*');
 }
 let emExecucao = [];   // comandos enviados (para saber qual bloco destacar)
+let idsReacao = new Set();   // blocos da reação que está rodando
+// salto para uma reação: o bloco onde o programa estava pisca; se o sensor estiver fora da tela, o minimapa pisca
+function mostrarSalto(idInterrompido, reacao) {
+  const el = wsInterno.querySelector(`.bloco[data-id="${idInterrompido}"]`);
+  if (el) { el.classList.remove('piscar'); void el.offsetWidth; el.classList.add('piscar'); }
+  const b = reacao.blocos[0], vx0 = -vistaX / zoom, vy0 = -vistaY / zoom;
+  const fora = reacao.x < vx0 || reacao.y < vy0 || reacao.x + 86 > vx0 + ws.clientWidth / zoom || reacao.y + ALT_BLOCO > vy0 + ws.clientHeight / zoom;
+  if (fora && minimapa.classList.contains('visivel')) {
+    minimapa.classList.remove('alerta'); void minimapa.offsetWidth; minimapa.classList.add('alerta');
+  }
+}
 let reacoes = 0;       // reações nesta execução (limite contra robô preso batendo para sempre)
 const MAX_REACOES = 50;
 
 addEventListener('message', ({ data }) => {
   if (!data?.tipo) return;
-  if (data.tipo === 'passo') destacar(emExecucao[data.indice]?.id);
-  if (data.tipo === 'fim') destacar(null);
+  if (data.tipo === 'passo') {
+    const c = emExecucao[data.indice];
+    destacar(c?.id);
+    // o sensor fica "disparado" (⚡) enquanto a reação dele roda
+    if (c?.cmd === 'sensor') idsReacao = new Set(cadeias.find(k => k.blocos[0].id === c.id)?.blocos.map(b => b.id));
+    else if (c && !idsReacao.has(c.id)) idsReacao = new Set();
+    wsInterno.querySelectorAll('.bloco').forEach(el => el.classList.toggle('disparou', idsReacao.has(+el.dataset.id) && el === el.parentNode.firstChild));
+  }
+  if (data.tipo === 'fim') { destacar(null); idsReacao = new Set(); wsInterno.querySelectorAll('.disparou').forEach(el => el.classList.remove('disparou')); }
   if (data.tipo === 'tocou') {
     // o robô tocou num terreno: se existe um sensor dele, a reação roda logo em seguida
     const r = cadeiaReacao(data.terreno);
-    const cmds = r && reacoes++ < MAX_REACOES ? [{ cmd: 'pular', id: r.blocos[0].id }, ...comandos(r)] : [];
+    const cmds = r && reacoes++ < MAX_REACOES ? [{ cmd: 'sensor', id: r.blocos[0].id }, ...comandos(r)] : [];
+    if (cmds.length) mostrarSalto(emExecucao[data.indice]?.id, r);
     emExecucao.splice(data.indice + 1, 0, ...cmds);   // mesma posição em que o simulador insere
     paraSim({ tipo: 'reagir', comandos: cmds.map(({ cmd, n }) => ({ cmd, n })) });
   }
