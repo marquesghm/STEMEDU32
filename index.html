@@ -280,14 +280,14 @@ function montarPaleta() {
 function definirModoSimples(ligar) {
   simples = ligar;
   document.body.classList.toggle('simples', ligar);
-  document.querySelector('#btnModo b').textContent = ligar ? 'Modo completo' : 'Modo simplificado';
+  document.querySelector('#btnModo b').textContent = ligar ? 'Modo avançado' : 'Modo simplificado';
   if (ligar && !cadeias.some(c => c.blocos[0].tipo === 'play')) {
     // garante o Play: no canto de cima, acima de tudo que já existe
     const y = cadeias.length ? Math.min(...cadeias.map(c => c.y)) - ALT_BLOCO - 12 : 20;
     cadeias.unshift({ x: 20, y, blocos: [novoBloco('play')] });
     ultimaCadeia = cadeias[0];
   }
-  try { localStorage.setItem('modoSimples', ligar ? '1' : ''); } catch {}
+  try { localStorage.setItem('modo', ligar ? 'simples' : 'avancado'); } catch {}
   montarPaleta();
   desenhar();
 }
@@ -792,9 +792,10 @@ divisor.addEventListener('pointercancel', fimDivisao);
 
 try { const h = +localStorage.getItem('alturaSim'); if (h) sim.style.flexBasis = h + 'px'; } catch {}
 
-let modoSalvo = false;
-try { modoSalvo = !!localStorage.getItem('modoSimples'); } catch {}
-if (modoSalvo) definirModoSimples(true); else desenhar();
+// modo simplificado é o padrão; o avançado só se a pessoa escolheu antes
+let modoSalvo = null;
+try { modoSalvo = localStorage.getItem('modo'); } catch {}
+definirModoSimples(modoSalvo !== 'avancado');
 </script>
 </body>
 </html>
