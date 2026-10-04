@@ -68,7 +68,8 @@ Cada sequência (cadeia) tem posição própria.
 - Divisor entre simulador e workspace ajusta o tamanho dos dois.
 
 ## Cenários
-Menu ☰ → **Construir cenário** abre `cenario.html`. Terrenos (uma casa cada, chão 11×11):
+Menu ☰ → **Construir cenário** abre `cenario.html`. Ferramenta 🤖 **Robô**: tocar numa casa
+muda a saída do robô; tocar nele de novo gira 90° (salvo em `localStorage.inicioRobo`). Terrenos (uma casa cada, chão 11×11):
 
 | Terreno | Efeito pronto | Reação programável |
 |---|---|---|
