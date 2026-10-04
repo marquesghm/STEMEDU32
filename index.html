@@ -38,6 +38,14 @@
 
   /* simulador */
   #sim{flex:0 1 38%;min-height:60px;position:relative}
+  /* desfazer / refazer no canto inferior direito do simulador (refazer só aparece quando dá para refazer) */
+  .historico{position:absolute;right:8px;bottom:8px;display:flex;gap:6px}
+  .historico button{width:48px;height:48px;border:0;border-radius:14px;background:#fffe;font:700 26px system-ui;
+    color:#444;box-shadow:0 3px 0 rgba(0,0,0,.2);cursor:pointer;padding:0}
+  .historico button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+  .historico button:disabled{opacity:.35;cursor:default}
+  #btnRefazer, #cBtnRefazer{display:none}
+  #btnRefazer.visivel, #cBtnRefazer.visivel{display:block}
   /* divisor arrastável entre simulador e workspace */
   #divisor{flex:0 0 auto;height:7px;background:#f0e2b8;display:flex;align-items:center;justify-content:center;
     touch-action:none;cursor:ns-resize;position:relative;z-index:2}
@@ -116,7 +124,12 @@
   <button id="btnLimpar"><span>🗑️</span><b>Limpar tudo</b></button>
 </nav>
 
-<div id="sim"><iframe id="simFrame" src="simulador.html" title="Simulador 3D"></iframe></div>
+<div id="sim"><iframe id="simFrame" src="simulador.html" title="Simulador 3D"></iframe>
+  <div class="historico">
+    <button id="btnDesfazer" title="Desfazer" disabled>↶</button>
+    <button id="btnRefazer" title="Refazer">↷</button>
+  </div>
+</div>
 
 <div id="divisor" title="Arraste para mudar o tamanho"></div>
 <div id="ws"><div id="wsInterno"></div><canvas id="minimapa" title="Ver todos os blocos"></canvas></div>
@@ -252,7 +265,44 @@ function desenhar() {
 
 // o programa fica salvo no navegador: é o mesmo na página de programar e no construtor de cenários
 function salvarPrograma() {
-  try { localStorage.setItem('programa', JSON.stringify({ cadeias, proxId })); } catch {}
+  const json = JSON.stringify({ cadeias, proxId });
+  try { localStorage.setItem('programa', json); } catch {}
+  registrarHistorico(json);
+}
+
+// ---------- desfazer / refazer ----------
+// Cada desenho que muda o programa vira um "retrato" no histórico. Desfazer/refazer só anda nele.
+const MAX_HISTORICO = 60;
+let historico = [], posHistorico = -1;
+
+function registrarHistorico(json) {
+  if (historico[posHistorico] === json) return;      // nada mudou (ex.: só redesenhou)
+  historico = historico.slice(0, posHistorico + 1);  // mudança nova apaga o que dava para refazer
+  historico.push(json);
+  if (historico.length > MAX_HISTORICO) historico.shift();
+  posHistorico = historico.length - 1;
+  atualizarBotoesHistorico();
+}
+
+function irNoHistorico(passo) {
+  const p = posHistorico + passo;
+  if (p < 0 || p >= historico.length) return;
+  posHistorico = p;
+  const dados = JSON.parse(historico[p]);
+  cadeias = dados.cadeias; proxId = dados.proxId;
+  ultimaCadeia = cadeias[0] || null;
+  fecharMenuNumero?.();
+  desenhar();
+  atualizarBotoesHistorico();
+}
+const desfazer = () => irNoHistorico(-1);
+const refazer  = () => irNoHistorico(+1);
+
+function atualizarBotoesHistorico() {
+  const pode = { podeDesfazer: posHistorico > 0, podeRefazer: posHistorico < historico.length - 1 };
+  const bd = document.getElementById('btnDesfazer'), br = document.getElementById('btnRefazer');
+  if (bd) { bd.disabled = !pode.podeDesfazer; br.classList.toggle('visivel', pode.podeRefazer); }
+  if (MODO_CENARIO) parent.postMessage({ tipo: 'historico', ...pode }, '*');   // botões ficam no construtor
 }
 function carregarPrograma() {
   try {
@@ -777,6 +827,8 @@ addEventListener('message', ({ data }) => {
   if (data.tipo === 'cenarioMudou') montarPaleta();
   // comandos vindos do construtor de cenários (botões do header dele)
   if (data.tipo === 'executarTodos') executarTodos();
+  if (data.tipo === 'desfazer') desfazer();
+  if (data.tipo === 'refazer') refazer();
   if (data.tipo === 'pararTudo') document.getElementById('btnParar').click();
 });
 
@@ -803,6 +855,8 @@ function executarTodos() {
 }
 
 document.getElementById('btnPlay').onclick = executarTodos;
+document.getElementById('btnDesfazer').onclick = desfazer;
+document.getElementById('btnRefazer').onclick = refazer;
 document.getElementById('btnParar').onclick = () => {
   paraSim({ tipo: 'reiniciar' }); destacar(null);
   if (porta) escreverLinha('parar');

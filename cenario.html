@@ -21,7 +21,16 @@
   .btn.vermelho{background:#ff4b4b;color:#fff}
 
   /* cenário 3D (simulador em modo edição) */
-  #sim{flex:0 1 42%;min-height:120px}
+  #sim{flex:0 1 42%;min-height:120px;position:relative}
+
+  /* desfazer / refazer dos blocos (o histórico fica no editor; aqui só os botões) */
+  .historico{position:absolute;right:8px;bottom:8px;display:flex;gap:6px}
+  .historico button{width:48px;height:48px;border:0;border-radius:14px;background:#fffe;font:700 26px system-ui;
+    color:#444;box-shadow:0 3px 0 rgba(0,0,0,.2);cursor:pointer;padding:0}
+  .historico button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+  .historico button:disabled{opacity:.35;cursor:default}
+  #cBtnRefazer{display:none}
+  #cBtnRefazer.visivel{display:block}
   #sim iframe, #ws iframe{border:0;width:100%;height:100%;display:block}
 
   /* paleta de terrenos: tocar escolhe a ferramenta; depois tocar/arrastar no chão pinta */
@@ -47,7 +56,12 @@
   <button class="btn vermelho" id="btnParar" title="Parar">⏹</button>
 </header>
 
-<div id="sim"><iframe id="simFrame" src="simulador.html?editar=1" title="Cenário 3D"></iframe></div>
+<div id="sim"><iframe id="simFrame" src="simulador.html?editar=1" title="Cenário 3D"></iframe>
+  <div class="historico">
+    <button id="cBtnDesfazer" title="Desfazer" disabled>↶</button>
+    <button id="cBtnRefazer" title="Refazer">↷</button>
+  </div>
+</div>
 
 <div id="terrenos">
   <button data-f="" class="sel" title="Mexer a câmera">✋<small>Mover</small></button>
@@ -74,6 +88,11 @@ const paraWs  = msg => wsFrame.contentWindow?.postMessage(msg, '*');
 
 addEventListener('message', ({ source, data }) => {
   if (!data?.tipo) return;
+  if (data.tipo === 'historico') {   // o editor avisa o que dá para desfazer/refazer
+    document.getElementById('cBtnDesfazer').disabled = !data.podeDesfazer;
+    document.getElementById('cBtnRefazer').classList.toggle('visivel', data.podeRefazer);
+    return;
+  }
   if (source === simFrame.contentWindow) paraWs(data);       // passo, fim, tocou, vitoria, cenarioMudou...
   else if (source === wsFrame.contentWindow) paraSim(data);  // executar, reagir, reiniciar...
 });
@@ -89,6 +108,8 @@ document.getElementById('btnLimpar').onclick = () => {
 };
 
 document.getElementById('btnPlay').onclick = () => paraWs({ tipo: 'executarTodos' });
+document.getElementById('cBtnDesfazer').onclick = () => paraWs({ tipo: 'desfazer' });
+document.getElementById('cBtnRefazer').onclick = () => paraWs({ tipo: 'refazer' });
 document.getElementById('btnParar').onclick = () => paraWs({ tipo: 'pararTudo' });
 document.getElementById('btnVoltar').onclick = () => { location.href = 'index.html'; };
 </script>
