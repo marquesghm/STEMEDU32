@@ -198,19 +198,51 @@ function limitesVista() {
   const minX = Math.min(...cadeias.map(c => c.x)), maxX = Math.max(...cadeias.map(c => c.x + larguraCadeia(c)));
   const minY = Math.min(...cadeias.map(c => c.y)), maxY = Math.max(...cadeias.map(c => c.y + ALT_BLOCO));
   // dá para empurrar os blocos para qualquer lado até sobrar só um pedaço visível
-  return { x0: VISIVEL - maxX, x1: ws.clientWidth  - VISIVEL - minX,
-           y0: VISIVEL - maxY, y1: ws.clientHeight - VISIVEL - minY };
+  const x0 = VISIVEL - maxX, y0 = VISIVEL - maxY;
+  return { x0, x1: Math.max(x0, ws.clientWidth  - VISIVEL - minX),
+           y0, y1: Math.max(y0, ws.clientHeight - VISIVEL - minY) };
 }
 
-function aplicarVista() {
-  const l = limitesVista();
-  vistaX = Math.min(l.x1, Math.max(l.x0, vistaX));
-  vistaY = Math.min(l.y1, Math.max(l.y0, vistaY));
+const limitar = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// elástico: passou do limite, anda cada vez menos (resistência), como puxar uma borracha
+const ELASTICO = 160;
+function elastico(v, a, b) {
+  const puxa = d => ELASTICO * (1 - 1 / (d / ELASTICO + 1));
+  return v < a ? a - puxa(a - v) : v > b ? b + puxa(v - b) : v;
+}
+
+function desenharVista() {
   wsInterno.style.transform = `translate(${vistaX}px, ${vistaY}px)`;
   ws.style.backgroundPosition = `${vistaX}px ${vistaY}px`;   // pontinhos acompanham
 }
 
+function aplicarVista() {
+  if (pan) return;   // durante o arraste do fundo quem manda é o elástico
+  const l = limitesVista();
+  vistaX = limitar(vistaX, l.x0, l.x1);
+  vistaY = limitar(vistaY, l.y0, l.y1);
+  desenharVista();
+}
+
 function moverVista(dx, dy) { vistaX += dx; vistaY += dy; aplicarVista(); }
+
+// solta o elástico: volta suavemente para dentro do limite
+let animVolta = 0;
+function voltarElastico() {
+  const l = limitesVista();
+  const x0 = vistaX, y0 = vistaY, x1 = limitar(vistaX, l.x0, l.x1), y1 = limitar(vistaY, l.y0, l.y1);
+  if (x0 === x1 && y0 === y1) return;
+  const t0 = performance.now(), dur = 350;
+  cancelAnimationFrame(animVolta);
+  const passo = agora => {
+    const k = Math.min(1, (agora - t0) / dur), e = 1 - (1 - k) ** 3;   // desacelera no fim
+    vistaX = x0 + (x1 - x0) * e; vistaY = y0 + (y1 - y0) * e;
+    desenharVista();
+    if (k < 1) animVolta = requestAnimationFrame(passo);
+  };
+  animVolta = requestAnimationFrame(passo);
+}
 
 Object.keys(BLOCOS).forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor })));
 
@@ -400,15 +432,19 @@ function rolarAte(c) {
 let pan = null;
 ws.addEventListener('pointerdown', e => {
   if (e.target.closest('.bloco')) return;
-  pan = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  cancelAnimationFrame(animVolta);
+  // brutoX/Y = onde a vista estaria sem limite; a tela mostra a versão "elástica"
+  pan = { id: e.pointerId, x0: e.clientX, y0: e.clientY, vx: vistaX, vy: vistaY };
   ws.setPointerCapture(e.pointerId);
 });
 ws.addEventListener('pointermove', e => {
   if (!pan || e.pointerId !== pan.id) return;
-  moverVista(e.clientX - pan.x, e.clientY - pan.y);
-  pan.x = e.clientX; pan.y = e.clientY;
+  const l = limitesVista();
+  vistaX = elastico(pan.vx + e.clientX - pan.x0, l.x0, l.x1);
+  vistaY = elastico(pan.vy + e.clientY - pan.y0, l.y0, l.y1);
+  desenharVista();
 });
-const fimPan = e => { if (pan && e.pointerId === pan.id) pan = null; };
+const fimPan = e => { if (pan && e.pointerId === pan.id) { pan = null; voltarElastico(); } };
 ws.addEventListener('pointerup', fimPan);
 ws.addEventListener('pointercancel', fimPan);
 ws.addEventListener('wheel', e => {

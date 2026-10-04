@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "site", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8032"], "port": 8032 }
+    { "name": "site", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8032", "--bind", "0.0.0.0"], "port": 8032 }
   ]
 }
