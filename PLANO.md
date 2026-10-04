@@ -33,7 +33,6 @@ Programação tangível na web para crianças (~7 anos). Blocos horizontais
 | ↓ Trás | rosa | `tras(n)` |
 | ↺ Esquerda | rosa | `esquerda(n)` (n × 90°) |
 | ↻ Direita | rosa | `direita(n)` |
-
 | *f* Função (início) | vermelho/azul/verde/roxo | `function f_<cor>() ... end` |
 | *f*↷ Chamar função | mesma cor | `f_<cor>()` |
 
@@ -43,9 +42,13 @@ que começa com a função da mesma cor e depois volta (máx. 8 níveis, para
 proteger contra função que chama a si mesma).
 
 ## Workspace
-Área livre que rola nos dois sentidos e cresce com os blocos. Cada sequência
-(cadeia) tem posição própria. Arrastar do meio leva o bloco e os seguintes;
-perto de outra sequência ele encaixa (marcador azul); soltar na paleta apaga.
+Área livre, sem tamanho nem limite. Cada sequência (cadeia) tem posição própria.
+- Arrastar o fundo move a vista; pinça com 2 dedos (ou Ctrl+roda) dá zoom 0,4x–2x.
+- Arrastar do meio de uma sequência leva o bloco e os seguintes; perto de outra
+  sequência ele encaixa (marcador azul); soltar na paleta apaga.
+- Paleta: deslizar para os lados rola; puxar o bloco para cima pega.
+- Minimapa no canto quando algum bloco fica fora da tela; tocar nele mostra tudo.
+- Divisor entre simulador e workspace ajusta o tamanho dos dois.
 
 ## Protocolo com o microcontrolador (Web Serial, 115200)
 ```
