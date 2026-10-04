@@ -69,7 +69,7 @@ Cada sequência (cadeia) tem posição própria.
 
 ## Cenários
 Menu ☰ → **Construir cenário** abre `cenario.html`. Ferramenta 🤖 **Robô**: tocar numa casa
-muda a saída do robô; tocar nele de novo gira 90° (salvo em `localStorage.inicioRobo`). Terrenos (uma casa cada, chão 11×11):
+muda a saída do robô; tocar no robô abre a janelinha de orientação ↑→↓← (salvo em `localStorage.inicioRobo`). Terrenos (uma casa cada, chão 11×11):
 
 | Terreno | Efeito pronto | Reação programável |
 |---|---|---|

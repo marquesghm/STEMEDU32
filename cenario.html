@@ -43,6 +43,14 @@
   #terrenos button.sel{border-color:var(--laranja);background:#fff3e0}
   #terrenos .sep{flex:0 0 2px;background:#f5d2a3;margin:4px 2px}
 
+  /* janelinha de orientação do robô (abre ao tocar no robô com a ferramenta Robô) */
+  #menuRobo{position:fixed;z-index:30;display:none;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px);
+    gap:4px;padding:8px;background:#fff;border-radius:16px;border:3px solid var(--laranja);box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  #menuRobo.aberto{display:grid}
+  #menuRobo button{border:3px solid #f5d2a3;border-radius:12px;background:#fff;font:700 24px system-ui;cursor:pointer;padding:0}
+  #menuRobo button.atual{border-color:var(--laranja);background:#fff3e0}
+  #menuRobo .centro{display:flex;align-items:center;justify-content:center;font-size:26px}
+
   /* workspace = o próprio editor em modo cenário */
   #ws{flex:1 1 auto;min-height:200px}
 </style>
@@ -66,7 +74,7 @@
 <div id="terrenos">
   <button data-f="" class="sel" title="Mexer a câmera">✋<small>Mover</small></button>
   <div class="sep"></div>
-  <button data-f="robo" title="Tocar numa casa leva o robô; tocar nele de novo gira">🤖<small>Robô</small></button>
+  <button data-f="robo" title="Tocar numa casa leva o robô; tocar nele escolhe para onde ele olha">🤖<small>Robô</small></button>
   <div class="sep"></div>
   <button data-f="parede">🧱<small>Parede</small></button>
   <button data-f="estrela">⭐<small>Estrela</small></button>
@@ -82,6 +90,12 @@
 
 <div id="ws"><iframe id="wsFrame" src="index.html?modo=cenario" title="Programar reações"></iframe></div>
 
+<div id="menuRobo">
+  <span></span><button data-rot="0">↑</button><span></span>
+  <button data-rot="3">←</button><span class="centro">🤖</span><button data-rot="1">→</button>
+  <span></span><button data-rot="2">↓</button><span></span>
+</div>
+
 <script>
 // Esta página só junta as partes: o simulador (editando o cenário) e o editor de blocos.
 // Tudo que um manda para o outro passa por aqui.
@@ -91,6 +105,8 @@ const paraWs  = msg => wsFrame.contentWindow?.postMessage(msg, '*');
 
 addEventListener('message', ({ source, data }) => {
   if (!data?.tipo) return;
+  if (data.tipo === 'toqueSim') { menuRobo.classList.remove('aberto'); return; }
+  if (data.tipo === 'menuRobo') { abrirMenuRobo(data); return; }
   if (data.tipo === 'historico') return;   // histórico dos blocos (do editor) não é usado aqui
   if (data.tipo === 'historicoCenario') {  // o simulador avisa o que dá para desfazer/refazer nos terrenos
     document.getElementById('cBtnDesfazer').disabled = !data.podeDesfazer;
@@ -110,6 +126,23 @@ botoes.forEach(b => b.onclick = () => {
 document.getElementById('btnLimpar').onclick = () => {
   if (confirm('Apagar todo o cenário?')) paraSim({ tipo: 'limparCenario' });
 };
+
+// janelinha de orientação do robô: posiciona junto do robô (coordenadas vindas do simulador)
+const menuRobo = document.getElementById('menuRobo');
+function abrirMenuRobo({ x, y, rot }) {
+  menuRobo.querySelectorAll('button').forEach(b => b.classList.toggle('atual', +b.dataset.rot === rot));
+  menuRobo.classList.add('aberto');
+  const f = simFrame.getBoundingClientRect(), m = menuRobo.getBoundingClientRect();
+  menuRobo.style.left = Math.min(Math.max(8, f.left + x - m.width / 2), innerWidth - m.width - 8) + 'px';
+  menuRobo.style.top = Math.min(Math.max(8, f.top + y - m.height / 2), innerHeight - m.height - 8) + 'px';
+}
+menuRobo.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  paraSim({ tipo: 'orientarRobo', rot: +b.dataset.rot });
+  menuRobo.classList.remove('aberto');
+});
+document.addEventListener('pointerdown', e => { if (!menuRobo.contains(e.target)) menuRobo.classList.remove('aberto'); }, true);
 
 document.getElementById('btnPlay').onclick = () => paraWs({ tipo: 'executarTodos' });
 document.getElementById('cBtnDesfazer').onclick = () => paraSim({ tipo: 'desfazerCenario' });

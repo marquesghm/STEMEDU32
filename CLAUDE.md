@@ -9,6 +9,9 @@ Detalhes de design e protocolo em [PLANO.md](PLANO.md).
   - Sugestões minhas de UX: **perguntar antes** de implementar.
   - Se uma solução pedida for fraca em UX: **avisar** (motivo + alternativa) antes de seguir.
   - Ao apontar falha ou sugestão de UX: **ser direto** — 1 ou 2 linhas, sem textão.
+  - **Padrão de interação:** tocar na coisa abre uma janelinha com as opções, junto dela
+    (ex.: número do bloco, terreno do sensor, tempo da lâmpada, orientação do robô).
+    Nada de "toque repetido troca para o próximo".
 - **Modo simplificado é o padrão da conversa.** Pedidos sobre o editor sem modo explícito
   referem-se ao modo simplificado (blocos sem número, um único Play fixo fora da paleta,
   início de função criado automaticamente). Perguntar se deve valer também no avançado

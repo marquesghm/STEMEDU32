@@ -309,10 +309,15 @@ function pintar(ev) {
   ultimaCasa = k;
   const naSaida = c.x === inicio.x && c.z === inicio.z;
   if (ferramenta === 'robo') {
-    // leva o robô para a casa tocada; tocar na casa onde ele já está gira 90°
+    // leva o robô para a casa tocada; tocar no robô abre a janelinha de orientação (na página de cima)
     if (cenario[k] === 'parede') return;
-    if (naSaida) inicio.rot = (inicio.rot + 1) % 4;
-    else { inicio.x = c.x; inicio.z = c.z; }
+    if (naSaida) {
+      const v = new THREE.Vector3(inicio.x, 0.6, inicio.z).project(camera);
+      parent.postMessage({ tipo: 'menuRobo', rot: inicio.rot,
+        x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }, '*');
+      return;
+    }
+    inicio.x = c.x; inicio.z = c.z;
     reiniciar();
     salvarCenario();
     return;
@@ -324,6 +329,7 @@ function pintar(ev) {
 }
 if (EDITAR) {
   renderer.domElement.addEventListener('pointerdown', ev => {
+    parent.postMessage({ tipo: 'toqueSim' }, '*');   // a página de cima fecha janelinhas abertas
     if (!ferramenta) return;
     pintando = true; ultimaCasa = '';
     pintar(ev);
@@ -553,6 +559,9 @@ addEventListener('message', ({ data }) => {
   else if (data.tipo === 'limparCenario') {
     cenario = {}; inicio = { x: 0, z: 0, rot: 0 };
     desenharCenario(); reiniciar(); salvarCenario(); registrarCenario();
+  }
+  else if (data.tipo === 'orientarRobo') {   // rot: 0 = de costas (↑ na visão de cima), 1 = →, 2 = ↓, 3 = ←
+    inicio.rot = data.rot; reiniciar(); salvarCenario(); registrarCenario();
   }
   else if (data.tipo === 'desfazerCenario') andarCenario(-1);
   else if (data.tipo === 'refazerCenario') andarCenario(+1);
