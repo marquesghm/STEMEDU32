@@ -226,7 +226,26 @@ function desenhar() {
 
 function arrumar() {
   cadeias = cadeias.filter(c => c.blocos.length);
+  if (simples) sincronizarFuncoes();
   if (!cadeias.includes(ultimaCadeia)) ultimaCadeia = cadeias[0] || null;
+}
+
+// Modo simplificado: o início de função não fica na paleta. Ele aparece sozinho
+// (abaixo do Play) quando um bloco "chamar" de uma cor entra no workspace, e some
+// se ficar vazio e ninguém mais chamar aquela cor.
+function sincronizarFuncoes() {
+  const cores = new Set(cadeias.flatMap(c => c.blocos).filter(b => b.tipo === 'chamar').map(b => b.cor));
+  cadeias = cadeias.filter(c => !(c.blocos[0].tipo === 'funcao' && c.blocos.length === 1 && !cores.has(c.blocos[0].cor)));
+  for (const cor of LISTA_CORES) {
+    if (!cores.has(cor) || cadeiaFuncao(cor)) continue;
+    const play = cadeiasPlay()[0], x = play ? play.x : 20;
+    let y = (play ? play.y : 8) + ALT_BLOCO + 12;
+    // desce até achar uma linha livre (sem cadeia ocupando aquele espaço)
+    const ocupado = y => cadeias.some(c => c.y < y + ALT_BLOCO && c.y + ALT_BLOCO > y &&
+                                         c.x < x + 2 * PASSO && c.x + larguraCadeia(c) > x);
+    while (ocupado(y)) y += ALT_BLOCO + 12;
+    cadeias.push({ x, y, blocos: [novoBloco('funcao', { cor })] });
+  }
 }
 
 // ---------- vista (pan) ----------
@@ -273,7 +292,7 @@ const valorN = b => simples ? 1 : b.n;
 function montarPaleta() {
   paleta.innerHTML = '';
   Object.keys(BLOCOS)
-    .filter(t => !(simples && t === 'play'))
+    .filter(t => !(simples && (t === 'play' || t === 'funcao')))
     .forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor })));
 }
 
@@ -442,7 +461,7 @@ function tocar(a) {
   const c = cadeias[a.ci], b = c.blocos[a.bi];
   ultimaCadeia = c;
   if (b.tipo === 'play') executar(c);
-  else if (BLOCOS[b.tipo].grupo === 'funcao') {            // toque = troca a cor
+  else if (b.tipo === 'chamar' || (b.tipo === 'funcao' && !simples)) {   // toque = troca a cor
     b.cor = LISTA_CORES[(LISTA_CORES.indexOf(b.cor) + 1) % LISTA_CORES.length];
     desenhar();
   }
