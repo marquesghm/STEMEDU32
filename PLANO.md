@@ -76,7 +76,7 @@ Menu ☰ → **Construir cenário** abre `cenario.html`. Terrenos (uma casa cada
 | ⭐ Estrela | é coletada; todas = desafio completo | sim |
 | 💧 Água | robô afunda e o programa acaba | — |
 | 🟥🟦🟩 Chão colorido | nenhum | sim |
-| ⬛ Piso preto | fica amarelo quando a lâmpada acende com o robô em cima dele (até reiniciar) | sim |
+| ⬛ Piso preto | a lâmpada com o robô em cima troca preto ↔ amarelo (até reiniciar) | sim: sensor de piso preto e de piso amarelo |
 
 Bloco laranja **sensor**: chapéu cujos blocos rodam logo que o robô toca no terreno do bloco
 (interrompe o resto do comando atual). Simplificado: um sensor por terreno na paleta.

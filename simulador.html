@@ -173,20 +173,25 @@ function lampada(acesa) {
   if (acesa) iluminarPisos();
 }
 
-// piso preto na casa do robô fica amarelo (e continua até reiniciar)
+// piso preto na casa do robô: a luz troca preto <-> amarelo (fica assim até reiniciar).
+// Para os sensores, um piso preto aceso conta como 'chao_amarelo'.
 const COR_ACESO = '#ffd400';
+let pisosAcesos = new Set();
+function pintarPiso(k, aceso) {
+  const m = malhas[k];
+  if (!m) return;
+  m.material.color.set(aceso ? COR_ACESO : TERRENOS.chao_preto.cor);
+  m.material.emissive?.set(aceso ? '#6b5a00' : '#000000');
+}
 function iluminarPisos() {
   const k = chaveCasa(Math.round(robo.position.x), Math.round(robo.position.z));
-  if (cenario[k] === 'chao_preto' && malhas[k]) {
-    malhas[k].material.color.set(COR_ACESO);
-    malhas[k].material.emissive?.set('#6b5a00');
-  }
+  if (cenario[k] !== 'chao_preto') return;
+  if (pisosAcesos.has(k)) pisosAcesos.delete(k); else pisosAcesos.add(k);
+  pintarPiso(k, pisosAcesos.has(k));
 }
 function apagarPisos() {
-  for (const [k, m] of Object.entries(malhas)) if (cenario[k] === 'chao_preto') {
-    m.material.color.set(TERRENOS.chao_preto.cor);
-    m.material.emissive?.set('#000000');
-  }
+  for (const k of pisosAcesos) pintarPiso(k, false);
+  pisosAcesos = new Set();
 }
 
 // rastro
@@ -403,7 +408,8 @@ function chegouNaCasa(a) {
   robo.position.y = 0;
   rastroPts.push(robo.position.clone().setY(0.03)); atualizarRastro();
   const k = chaveCasa(Math.round(robo.position.x), Math.round(robo.position.z));
-  const tipo = estrelasPegas.has(k) ? null : cenario[k];
+  let tipo = estrelasPegas.has(k) ? null : cenario[k];
+  if (tipo === 'chao_preto' && pisosAcesos.has(k)) tipo = 'chao_amarelo';
   if (tipo === 'agua') {   // caiu na água: afunda e o programa acaba
     atual = { tipo: 'afundar', t: 0, dur: 0.6 };
     return;

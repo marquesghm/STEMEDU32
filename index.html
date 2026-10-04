@@ -176,7 +176,8 @@ const CORES_FUNCAO = {
 const LISTA_CORES = Object.keys(CORES_FUNCAO);
 
 // terrenos do cenário (mesmos nomes do simulador) e seus mini desenhos (dentro do quadrado 30..62 x 14..46)
-const TERRENOS = ['parede', 'estrela', 'agua', 'chao_vermelho', 'chao_azul', 'chao_verde', 'chao_preto'];
+// chao_amarelo = piso preto aceso pela lâmpada (só existe para os sensores; não se pinta no construtor)
+const TERRENOS = ['parede', 'estrela', 'agua', 'chao_vermelho', 'chao_azul', 'chao_verde', 'chao_preto', 'chao_amarelo'];
 const MINI_TERRENO = {
   // parede com rachadura (o sensor de parede = robô bateu nela)
   parede:        '<rect x="34" y="18" width="24" height="24" fill="#8a8f99"/><path d="M34 26 H58 M34 34 H58 M46 18 V26 M40 26 V34 M52 26 V34 M46 34 V42" stroke="#5d626b" stroke-width="2"/>' +
@@ -187,7 +188,8 @@ const MINI_TERRENO = {
   chao_vermelho: '<rect x="34" y="18" width="24" height="24" rx="3" fill="#ff5a4f"/>',
   chao_azul:     '<rect x="34" y="18" width="24" height="24" rx="3" fill="#3d8bff"/>',
   chao_verde:    '<rect x="34" y="18" width="24" height="24" rx="3" fill="#2fbf5b"/>',
-  chao_preto:    '<rect x="34" y="18" width="24" height="24" rx="3" fill="#222"/><path d="M46 21 V24 M46 36 V39 M37 30 H40 M52 30 H55" stroke="#ffd400" stroke-width="2.5" stroke-linecap="round"/><circle cx="46" cy="30" r="3.5" fill="#ffd400"/>',
+  chao_preto:    '<rect x="34" y="18" width="24" height="24" rx="3" fill="#222"/>',
+  chao_amarelo:  '<rect x="34" y="18" width="24" height="24" rx="3" fill="#ffd400" stroke="#c99700" stroke-width="1.5"/><path d="M46 21 V24 M46 36 V39 M37 30 H40 M52 30 H55" stroke="#8a6d00" stroke-width="2.5" stroke-linecap="round"/><circle cx="46" cy="30" r="3.5" fill="#8a6d00"/>',
 };
 
 const GIRO ='<path d="M47.2 41.2 A13 13 0 1 0 25 32" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>' +
