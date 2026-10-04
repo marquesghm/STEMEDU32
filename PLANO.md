@@ -37,7 +37,7 @@ Programação tangível na web para crianças (~7 anos). Blocos horizontais
 | *f* Função (início) | vermelho/azul/verde/roxo | `function f_<cor>() ... end` |
 | *f*↷ Chamar função | mesma cor | `f_<cor>()` |
 
-`n` = 1..9, a criança toca na bolinha do número para mudar.
+`n` = 0..9: tocar na bolinha do número abre um menu com 0 a 9.
 Nos blocos de função, um toque troca a cor. O "chamar" pula para a sequência
 que começa com a função da mesma cor e depois volta (máx. 8 níveis, para
 proteger contra função que chama a si mesma).

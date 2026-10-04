@@ -64,6 +64,15 @@
   .fantasma{position:fixed;transform-origin:0 0;z-index:10;pointer-events:none;opacity:.85;display:flex;align-items:flex-start}
   .marcador{position:absolute;width:6px;height:64px;border-radius:3px;background:#00b7ff;pointer-events:none}
 
+  /* menu de números do bloco */
+  #menuNumero{position:fixed;z-index:25;display:none;grid-template-columns:repeat(5,44px);gap:6px;padding:8px;
+    background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:3px solid var(--rosa-esc)}
+  #menuNumero.aberto{display:grid}
+  #menuNumero button{width:44px;height:44px;border-radius:50%;border:2px solid #f0c4e4;background:#fff;
+    font:700 20px system-ui;color:var(--texto);cursor:pointer;padding:0}
+  #menuNumero button.atual{background:var(--rosa);border-color:var(--rosa-esc);color:#fff}
+  #menuNumero button:active{transform:scale(.92)}
+
   /* lua */
   #lua{position:fixed;inset:auto 12px 12px 12px;max-height:50vh;overflow:auto;background:#222;color:#9f9;
     font:14px/1.4 ui-monospace,Consolas,monospace;border-radius:12px;padding:12px;white-space:pre;
@@ -89,6 +98,7 @@
 <div id="ws"><div id="wsInterno"></div><canvas id="minimapa" title="Ver todos os blocos"></canvas></div>
 <div id="paleta"></div>
 
+<div id="menuNumero"></div>
 <pre id="lua"></pre>
 <div id="aviso"></div>
 
@@ -388,8 +398,43 @@ function tocar(a) {
     b.cor = LISTA_CORES[(LISTA_CORES.indexOf(b.cor) + 1) % LISTA_CORES.length];
     desenhar();
   }
-  else if (a.alvoNum) { b.n = b.n % 9 + 1; desenhar(); }   // toque no número = 1..9
+  else if (a.alvoNum) abrirMenuNumero(b, a.alvoNum);      // toque no número = menu 0..9
 }
+
+// ---------- menu de números (0..9) que abre em cima da bolinha do bloco ----------
+const menuNumero = document.getElementById('menuNumero');
+for (let n = 0; n <= 9; n++) {
+  const bt = document.createElement('button');
+  bt.textContent = n; bt.dataset.n = n;
+  menuNumero.appendChild(bt);
+}
+let blocoDoMenu = null;
+
+function abrirMenuNumero(b, numEl) {
+  blocoDoMenu = b;
+  menuNumero.querySelectorAll('button').forEach(bt => bt.classList.toggle('atual', +bt.dataset.n === b.n));
+  menuNumero.classList.add('aberto');
+  // posiciona logo abaixo da bolinha (ou acima, se não couber), sem sair da tela
+  const r = numEl.getBoundingClientRect(), m = menuNumero.getBoundingClientRect();
+  let x = r.left + r.width / 2 - m.width / 2, y = r.bottom + 6;
+  if (y + m.height > innerHeight - 8) y = r.top - m.height - 6;
+  menuNumero.style.left = limitar(x, 8, innerWidth - m.width - 8) + 'px';
+  menuNumero.style.top = Math.max(8, y) + 'px';
+}
+function fecharMenuNumero() { menuNumero.classList.remove('aberto'); blocoDoMenu = null; }
+
+menuNumero.addEventListener('click', e => {
+  const bt = e.target.closest('button');
+  if (!bt || !blocoDoMenu) return;
+  blocoDoMenu.n = +bt.dataset.n;
+  fecharMenuNumero();
+  desenhar();
+});
+// tocar fora fecha o menu (fase de captura: antes de qualquer outro gesto)
+document.addEventListener('pointerdown', e => {
+  if (blocoDoMenu && !menuNumero.contains(e.target)) fecharMenuNumero();
+}, true);
+menuNumero.addEventListener('pointerdown', e => e.stopPropagation());
 
 const sobrePaleta = e => e.clientY > paleta.getBoundingClientRect().top;
 
