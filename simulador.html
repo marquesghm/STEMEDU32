@@ -148,6 +148,11 @@ function criarRobo() {
   }
   const antena = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), mat('#ffd400'));
   antena.position.y = 1.05; r.add(antena);
+  r.userData.antena = antena;
+  // luz da lâmpada (bloco lâmpada): começa apagada
+  const brilho = new THREE.PointLight('#ffe066', 0, 2.5);
+  brilho.position.y = 1.05; r.add(brilho);
+  r.userData.brilho = brilho;
   // rodas
   for (const x of [-0.4, 0.4]) {
     const roda = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.1, 20), mat('#333'));
@@ -158,6 +163,14 @@ function criarRobo() {
 }
 const robo = criarRobo();
 scene.add(robo);
+
+// lâmpada da cabeça: acesa = bolinha maior, brilhando, e iluminando em volta
+function lampada(acesa) {
+  const { antena, brilho } = robo.userData;
+  antena.material.emissive.set(acesa ? '#ffd400' : '#000000');
+  antena.scale.setScalar(acesa ? 1.8 : 1);
+  brilho.intensity = acesa ? 3 : 0;
+}
 
 // rastro
 const rastroMat = new THREE.LineBasicMaterial({ color: '#ff4fc8' });
@@ -322,6 +335,7 @@ let fila = [], atual = null, indice = -1, estrelasPegas = new Set();
 function reiniciar() {
   fila = []; atual = null; indice = -1;
   robo.position.set(0, 0, 0); robo.rotation.y = ROT_INICIAL; robo.visible = true;
+  lampada(false);
   estrelasPegas = new Set();
   for (const m of Object.values(malhas)) m.visible = true;
   rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
@@ -339,6 +353,9 @@ function proximo() {
   if (cmd === 'frente' || cmd === 'tras') {
     if (n > 0) { andarUmaCasa(cmd === 'frente' ? 1 : -1, n); return; }
     atual = { tipo: 'espera', t: 0, dur: 0.1 };
+  } else if (cmd === 'luz') {          // n = segundos acesa
+    lampada(true);
+    atual = { tipo: 'luz', t: 0, dur: Math.max(0.05, n) };
   } else if (cmd === 'esquerda' || cmd === 'direita') {
     const ang = (cmd === 'esquerda' ? 1 : -1) * n * Math.PI / 2;
     atual = { tipo: 'girar', de: robo.rotation.y, para: robo.rotation.y + ang, t: 0,
@@ -414,7 +431,7 @@ function animar() {
         parent.postMessage({ tipo: 'caiu' }, '*');
         parent.postMessage({ tipo: 'fim' }, '*');
       }
-      else proximo();
+      else { if (a.tipo === 'luz') lampada(false); proximo(); }
     }
   }
   for (const m of grupoCenario.children) if (m.userData.gira) m.rotation.y += dt * 1.5;

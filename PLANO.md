@@ -50,6 +50,7 @@ pedida tiver um ponto fraco de UX, isso é apontado (com alternativa) antes de s
 | ↻ Direita | rosa | `direita(n)` |
 | *f* Função (início) | vermelho/azul/verde/roxo | `function f_<cor>() ... end` |
 | *f*↷ Chamar função | mesma cor | `f_<cor>()` |
+| 💡 Lâmpada | verde-água | `luz(ms)` — acende a bolinha da cabeça (simplificado: 500 ms; avançado: 0,5 a 5 s na bolinha) |
 
 `n` = 0..9: tocar na bolinha do número abre um menu com 0 a 9.
 Nos blocos de função, um toque troca a cor. O "chamar" pula para a sequência

@@ -101,6 +101,10 @@
   #menuTerreno button svg{width:100%;height:100%;display:block}
   #menuTerreno button.atual{border-color:#ff9d1a;background:#fff3e0}
   #menuTerreno button:active{transform:scale(.92)}
+  .bloco .num.tempo{font-size:16px;border-color:#0b7f76}
+  #menuNumero.tempo{grid-template-columns:repeat(3,64px);border-color:#0b7f76}
+  #menuNumero.tempo button{width:64px;border-radius:22px;font-size:18px;border-color:#b6e8e3}
+  #menuNumero.tempo button.atual{background:#12b3a6;border-color:#0b7f76}
   #menuNumero{position:fixed;z-index:25;display:none;grid-template-columns:repeat(5,44px);gap:6px;padding:8px;
     background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:3px solid var(--rosa-esc)}
   #menuNumero.aberto{display:grid}
@@ -159,6 +163,7 @@
 const CORES = {
   inicio:   ['var(--amarelo)', 'var(--amarelo-esc)'],
   evento:   ['#ff9d1a', '#c46a00'],
+  luz:      ['#12b3a6', '#0b7f76'],
   movimento:['var(--rosa)',    'var(--rosa-esc)'],
 };
 // blocos de função: a cor liga a chamada à sequência que ela executa
@@ -194,6 +199,9 @@ const ICONES = {
   // chapéu de função: "f" grande (começo da sequência da função)
   funcao:   '<text x="44" y="46" font-size="38" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text>',
   // chamar função: "f" + seta "pula para lá"
+  lampada:  '<path d="M36 13 A12 12 0 0 1 43 34.7 V40 H29 V34.7 A12 12 0 0 1 36 13 Z" fill="#fff"/>' +
+            '<rect x="29" y="42" width="14" height="4" rx="2" fill="#fff"/><rect x="31.5" y="48" width="9" height="3" rx="1.5" fill="#fff"/>' +
+            '<path d="M18 22 L22 24 M54 22 L50 24 M16 34 H21 M56 34 H51" stroke="#fff" stroke-width="3" stroke-linecap="round"/>',
   // sensor: no simplificado mostra o terreno (cada bloco é de um terreno);
   // no avançado mostra ondas de sensor e o terreno vai na bolinha de baixo
   sensor:   b => simples
@@ -213,7 +221,11 @@ const BLOCOS = {
   chamar:   { grupo:'funcao',    icone:'chamar',   cor:'vermelho' },
   // sensor: começo de uma reação que roda quando o robô toca no terreno do bloco
   sensor:   { grupo:'evento',    icone:'sensor',   chapeu:true, terreno:'parede' },
+  // lâmpada: acende a bolinha da cabeça do robô por n segundos (simplificado: sempre 0,5 s)
+  lampada:  { grupo:'luz',       icone:'lampada',  n:0.5, nSimples:0.5, opcoes:[0.5, 1, 1.5, 2, 3, 5] },
 };
+// texto da bolinha: número, ou tempo em segundos ("0,5s") nos blocos de tempo
+const textoN = b => BLOCOS[b.tipo].opcoes ? String(b.n).replace('.', ',') + 's' : String(b.n);
 const MOVIMENTOS = ['frente', 'tras', 'esquerda', 'direita'];
 
 // formatos (encaixe tipo quebra-cabeça: dente à direita, cavidade à esquerda)
@@ -251,7 +263,7 @@ function criarBlocoEl(b) {
   el.innerHTML =
     `<svg viewBox="0 0 86 64"><path d="${def.chapeu ? FORMA_INICIO : FORMA_MEIO}"
        fill="${cor}" stroke="${borda}" stroke-width="3"/>${typeof ICONES[def.icone] === 'function' ? ICONES[def.icone](b) : ICONES[def.icone]}</svg>` +
-    (def.n !== undefined ? `<div class="num">${b.n}</div>` : '') +
+    (def.n !== undefined ? `<div class="num${def.opcoes ? ' tempo' : ''}">${textoN(b)}</div>` : '') +
     (def.terreno ? `<div class="num terreno"><svg viewBox="30 14 32 32">${MINI_TERRENO[b.terreno]}</svg></div>` : '');
   if (b.terreno) el.dataset.terreno = b.terreno;
   return el;
@@ -412,7 +424,7 @@ let animVolta = 0;   // animação de vista em andamento (minimapa)
 // ---------- modo simplificado ----------
 // Blocos sem número (cada um faz uma ação só, n = 1) e um único Play, já no workspace e fora da paleta.
 let simples = false;
-const valorN = b => simples ? 1 : b.n;
+const valorN = b => simples ? (BLOCOS[b.tipo].nSimples ?? 1) : b.n;
 
 // ---------- modo cenário: este editor dentro do cenario.html (index.html?modo=cenario) ----------
 // Sem header e sem simulador próprio: o simulador é o do construtor, e as mensagens vão pela página de cima.
@@ -462,6 +474,7 @@ function comandos(cadeia, prof = 0, saida = []) {
   for (const b of cadeia.blocos) {
     if (saida.length >= MAX_COMANDOS) break;
     if (MOVIMENTOS.includes(b.tipo)) saida.push({ cmd: b.tipo, n: valorN(b), id: b.id });
+    else if (b.tipo === 'lampada') saida.push({ cmd: 'luz', n: valorN(b), id: b.id });
     else if (b.tipo === 'chamar') {
       saida.push({ cmd: 'pular', id: b.id });
       const f = cadeiaFuncao(b.cor);
@@ -478,6 +491,7 @@ function luaDe(blocos, ind = '') {
   const linhas = [];
   for (const b of blocos) {
     if (MOVIMENTOS.includes(b.tipo)) linhas.push(`${ind}${b.tipo}(${valorN(b)})`);
+    else if (b.tipo === 'lampada') linhas.push(`${ind}luz(${Math.round(valorN(b) * 1000)})`);   // em ms
     else if (b.tipo === 'chamar') linhas.push(`${ind}f_${b.cor}()`);
   }
   return linhas;
@@ -616,18 +630,21 @@ function tocar(a) {
   else if (a.alvoNum) abrirMenuNumero(b, a.alvoNum);      // toque no número = menu 0..9
 }
 
-// ---------- menu de números (0..9) que abre em cima da bolinha do bloco ----------
+// ---------- menu de valores que abre em cima da bolinha do bloco (0..9, ou as opções do bloco) ----------
 const menuNumero = document.getElementById('menuNumero');
-for (let n = 0; n <= 9; n++) {
-  const bt = document.createElement('button');
-  bt.textContent = n; bt.dataset.n = n;
-  menuNumero.appendChild(bt);
-}
 let blocoDoMenu = null;
 
 function abrirMenuNumero(b, numEl) {
   blocoDoMenu = b;
-  menuNumero.querySelectorAll('button').forEach(bt => bt.classList.toggle('atual', +bt.dataset.n === b.n));
+  const opcoes = BLOCOS[b.tipo].opcoes || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  menuNumero.innerHTML = '';
+  menuNumero.classList.toggle('tempo', !!BLOCOS[b.tipo].opcoes);
+  for (const n of opcoes) {
+    const bt = document.createElement('button');
+    bt.textContent = textoN({ tipo: b.tipo, n }); bt.dataset.n = n;
+    bt.classList.toggle('atual', n === b.n);
+    menuNumero.appendChild(bt);
+  }
   menuNumero.classList.add('aberto');
   // posiciona logo abaixo da bolinha (ou acima, se não couber), sem sair da tela
   const r = numEl.getBoundingClientRect(), m = menuNumero.getBoundingClientRect();
