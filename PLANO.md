@@ -34,7 +34,18 @@ Programação tangível na web para crianças (~7 anos). Blocos horizontais
 | ↺ Esquerda | rosa | `esquerda(n)` (n × 90°) |
 | ↻ Direita | rosa | `direita(n)` |
 
+| *f* Função (início) | vermelho/azul/verde/roxo | `function f_<cor>() ... end` |
+| *f*↷ Chamar função | mesma cor | `f_<cor>()` |
+
 `n` = 1..9, a criança toca na bolinha do número para mudar.
+Nos blocos de função, um toque troca a cor. O "chamar" pula para a sequência
+que começa com a função da mesma cor e depois volta (máx. 8 níveis, para
+proteger contra função que chama a si mesma).
+
+## Workspace
+Área livre que rola nos dois sentidos e cresce com os blocos. Cada sequência
+(cadeia) tem posição própria. Arrastar do meio leva o bloco e os seguintes;
+perto de outra sequência ele encaixa (marcador azul); soltar na paleta apaga.
 
 ## Protocolo com o microcontrolador (Web Serial, 115200)
 ```

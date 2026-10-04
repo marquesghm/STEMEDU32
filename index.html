@@ -88,6 +88,14 @@ const CORES = {
   inicio:   ['var(--amarelo)', 'var(--amarelo-esc)'],
   movimento:['var(--rosa)',    'var(--rosa-esc)'],
 };
+// blocos de função: a cor liga a chamada à sequência que ela executa
+const CORES_FUNCAO = {
+  vermelho:['#ff5a4f', '#b3261e'],
+  azul:    ['#3d8bff', '#1a56b8'],
+  verde:   ['#2fbf5b', '#1b7a37'],
+  roxo:    ['#9b5cff', '#5e2bb8'],
+};
+const LISTA_CORES = Object.keys(CORES_FUNCAO);
 
 // ícones desenhados em SVG (centro do bloco ~ x=36, y=32)
 const ICONES = {
@@ -96,6 +104,10 @@ const ICONES = {
   tras:     '<path d="M36 50 L50 34 H41 V14 H31 V34 H22 Z" fill="#fff"/>',
   esquerda: '<path d="M46 44 A13 13 0 1 0 26 30" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M17 26 L28 18 L32 32 Z" fill="#fff"/>',
   direita:  '<path d="M26 44 A13 13 0 1 1 46 30" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M55 26 L44 18 L40 32 Z" fill="#fff"/>',
+  // chapéu de função: "f" grande (começo da sequência da função)
+  funcao:   '<text x="44" y="46" font-size="38" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text>',
+  // chamar função: "f" + seta "pula para lá"
+  chamar:   '<text x="28" y="46" font-size="34" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text><path d="M38 40 Q44 22 56 24" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M52 15 L62 25 L50 31 Z" fill="#fff"/>',
 };
 
 // chapeu: true = só pode começar uma sequência (não encaixa no meio)
@@ -105,6 +117,8 @@ const BLOCOS = {
   tras:     { grupo:'movimento', icone:'tras',     n:1 },
   esquerda: { grupo:'movimento', icone:'esquerda', n:1 },
   direita:  { grupo:'movimento', icone:'direita',  n:1 },
+  funcao:   { grupo:'funcao',    icone:'funcao',   chapeu:true, cor:'vermelho' },
+  chamar:   { grupo:'funcao',    icone:'chamar',   cor:'vermelho' },
 };
 const MOVIMENTOS = ['frente', 'tras', 'esquerda', 'direita'];
 
@@ -121,7 +135,7 @@ const ENCAIXE = 40;        // distância (px) para "grudar" num encaixe
 //    O workspace é uma lista de cadeias (sequências de blocos) soltas.
 // =====================================================================
 let proxId = 1;
-const novoBloco = (tipo, extra = {}) => ({ id: proxId++, tipo, n: BLOCOS[tipo].n, ...extra });
+const novoBloco = (tipo, extra = {}) => ({ id: proxId++, tipo, n: BLOCOS[tipo].n, cor: BLOCOS[tipo].cor, ...extra });
 
 let cadeias = [ { x: 20, y: 20, blocos: [ novoBloco('play') ] } ];
 let ultimaCadeia = cadeias[0];   // onde o toque na paleta adiciona
@@ -135,7 +149,7 @@ const paleta = document.getElementById('paleta');
 // =====================================================================
 function criarBlocoEl(b) {
   const def = BLOCOS[b.tipo];
-  const [cor, borda] = CORES[def.grupo];
+  const [cor, borda] = def.grupo === 'funcao' ? CORES_FUNCAO[b.cor] : CORES[def.grupo];
   const el = document.createElement('div');
   el.className = 'bloco';
   el.dataset.tipo = b.tipo;
@@ -185,7 +199,7 @@ function arrumar() {
   }
 }
 
-Object.keys(BLOCOS).forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n })));
+Object.keys(BLOCOS).forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor })));
 
 // =====================================================================
 // 4. EXECUÇÃO / GERAÇÃO DE LUA
@@ -193,16 +207,41 @@ Object.keys(BLOCOS).forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: B
 const cadeiasPlay = () => cadeias.filter(c => c.blocos[0].tipo === 'play').sort((a, b) => a.y - b.y);
 
 // lista plana de comandos para o simulador ({cmd, n, id} — id = bloco a destacar)
-function comandos(cadeia) {
-  return cadeia.blocos.filter(b => MOVIMENTOS.includes(b.tipo)).map(b => ({ cmd: b.tipo, n: b.n, id: b.id }));
+// Ao chegar num bloco "chamar", a execução pula para a sequência da função da mesma cor e depois volta.
+const cadeiaFuncao = cor => cadeias.find(c => c.blocos[0].tipo === 'funcao' && c.blocos[0].cor === cor);
+const MAX_PROFUNDIDADE = 8, MAX_COMANDOS = 300;   // proteção contra função que chama a si mesma
+
+function comandos(cadeia, prof = 0, saida = []) {
+  for (const b of cadeia.blocos) {
+    if (saida.length >= MAX_COMANDOS) break;
+    if (MOVIMENTOS.includes(b.tipo)) saida.push({ cmd: b.tipo, n: b.n, id: b.id });
+    else if (b.tipo === 'chamar') {
+      saida.push({ cmd: 'pular', id: b.id });
+      const f = cadeiaFuncao(b.cor);
+      if (f && prof < MAX_PROFUNDIDADE) {
+        saida.push({ cmd: 'pular', id: f.blocos[0].id });
+        comandos(f, prof + 1, saida);
+      }
+    }
+  }
+  return saida;
 }
 
 function luaDe(blocos, ind = '') {
-  return blocos.filter(b => MOVIMENTOS.includes(b.tipo)).map(b => `${ind}${b.tipo}(${b.n})`);
+  const linhas = [];
+  for (const b of blocos) {
+    if (MOVIMENTOS.includes(b.tipo)) linhas.push(`${ind}${b.tipo}(${b.n})`);
+    else if (b.tipo === 'chamar') linhas.push(`${ind}f_${b.cor}()`);
+  }
+  return linhas;
 }
 
 function gerarLua(soPlay) {
   const linhas = ['-- programa STEMEDU32'];
+  for (const cor of LISTA_CORES) {
+    const f = cadeiaFuncao(cor);
+    if (f) linhas.push('', `function f_${cor}()`, ...luaDe(f.blocos, '  '), 'end');
+  }
   for (const c of soPlay ? [soPlay] : cadeiasPlay()) linhas.push('', '-- play', ...luaDe(c.blocos));
   return linhas.join('\n');
 }
@@ -293,6 +332,10 @@ function tocar(a) {
   const c = cadeias[a.ci], b = c.blocos[a.bi];
   ultimaCadeia = c;
   if (b.tipo === 'play') executar(c);
+  else if (BLOCOS[b.tipo].grupo === 'funcao') {            // toque = troca a cor
+    b.cor = LISTA_CORES[(LISTA_CORES.indexOf(b.cor) + 1) % LISTA_CORES.length];
+    desenhar();
+  }
   else if (a.alvoNum) { b.n = b.n % 9 + 1; desenhar(); }   // toque no número = 1..9
 }
 
