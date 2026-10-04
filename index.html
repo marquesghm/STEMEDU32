@@ -105,6 +105,7 @@
 <nav id="menu">
   <button id="btnConectar"><span>🔌</span><b>Conectar robô</b></button>
   <button id="btnLua"><span>{ }</span><b>Mostrar código</b></button>
+  <button id="btnLimpar"><span>🗑️</span><b>Limpar tudo</b></button>
 </nav>
 
 <div id="sim"><iframe id="simFrame" src="simulador.html" title="Simulador 3D"></iframe></div>
@@ -654,6 +655,16 @@ document.getElementById('btnMenu').onclick = () => menu.classList.toggle('aberto
 document.addEventListener('pointerdown', e => {
   if (!menu.contains(e.target) && !e.target.closest('#btnMenu')) menu.classList.remove('aberto');
 }, true);
+// limpar: volta ao começo (só um Play), com vista e zoom iniciais e robô no centro
+document.getElementById('btnLimpar').onclick = () => {
+  menu.classList.remove('aberto');
+  if (!confirm('Apagar todos os blocos?')) return;
+  cadeias = [ { x: 20, y: 20, blocos: [ novoBloco('play') ] } ];
+  ultimaCadeia = cadeias[0];
+  vistaX = vistaY = 0; zoom = 1;
+  paraSim({ tipo: 'reiniciar' });
+  desenhar();
+};
 document.getElementById('btnLua').onclick = () => {
   const aberto = document.getElementById('lua').classList.toggle('aberto');
   document.querySelector('#btnLua b').textContent = aberto ? 'Esconder código' : 'Mostrar código';
