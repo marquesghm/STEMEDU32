@@ -370,7 +370,8 @@ document.addEventListener('pointermove', e => {
   const fx = e.clientX - a.dx, fy = e.clientY - a.dy;
   a.fantasma.style.left = fx + 'px';
   a.fantasma.style.top  = fy + 'px';
-  rolarNaBorda(e.clientX, e.clientY);
+  if (!a.ux) iniciarRolagemBorda();
+  a.ux = e.clientX; a.uy = e.clientY;      // última posição do dedo (usada pela rolagem na borda)
   paleta.classList.toggle('lixo', !a.daPaleta && sobrePaleta(e));
   mostrarMarcador(sobrePaleta(e) ? null : acharEncaixe(fx, fy, a));
 });
@@ -528,12 +529,32 @@ ws.addEventListener('wheel', e => {
   } else moverVista(-(e.shiftKey ? e.deltaY : e.deltaX), e.shiftKey ? 0 : -e.deltaY);
 }, { passive: false });
 
-// enquanto arrasta um bloco perto da borda, a vista anda sozinha
-function rolarNaBorda(x, y) {
-  const r = ws.getBoundingClientRect(), B = 40, V = 8;
-  if (y < r.top || y > r.bottom) return;
-  moverVista(x < r.left + B ? V : x > r.right - B ? -V : 0,
-             y < r.top + B ? V : y > r.bottom - B ? -V : 0);
+// Enquanto arrasta um bloco e o dedo FICA parado perto da borda, a vista anda sozinha.
+// Regras para não atrapalhar o encaixe:
+//  - só depois que o dedo entrou no miolo do workspace (vindo da paleta, atravessar a borda de baixo não conta)
+//  - só depois de ~0,6 s parado na faixa da borda (passar por ela não rola)
+//  - nunca enquanto há um encaixe sendo mostrado
+const BORDA = 28, ESPERA_BORDA = 600, VEL_BORDA = 6;
+let timerBorda = 0;
+
+function rolarNaBorda(a) {
+  const r = ws.getBoundingClientRect(), x = a.ux, y = a.uy;
+  const dentro = y > r.top && y < r.bottom && x > r.left && x < r.right;
+  const naBorda = dentro && (x < r.left + BORDA || x > r.right - BORDA || y < r.top + BORDA || y > r.bottom - BORDA);
+  if (dentro && !naBorda) a.entrouNoMeio = true;
+  if (!naBorda || !a.entrouNoMeio || marcador) { a.bordaDesde = 0; return; }
+  const agora = performance.now();
+  if (!a.bordaDesde) { a.bordaDesde = agora; return; }
+  if (agora - a.bordaDesde < ESPERA_BORDA) return;
+  moverVista(x < r.left + BORDA ? VEL_BORDA : x > r.right - BORDA ? -VEL_BORDA : 0,
+             y < r.top + BORDA ? VEL_BORDA : y > r.bottom - BORDA ? -VEL_BORDA : 0);
+  // a vista andou: o fantasma está parado na tela, mas o encaixe embaixo dele mudou
+  mostrarMarcador(acharEncaixe(parseFloat(a.fantasma.style.left), parseFloat(a.fantasma.style.top), a));
+}
+
+function iniciarRolagemBorda() {
+  clearInterval(timerBorda);
+  timerBorda = setInterval(() => { if (arraste?.fantasma) rolarNaBorda(arraste); else clearInterval(timerBorda); }, 16);
 }
 
 // =====================================================================
