@@ -90,7 +90,9 @@
   .marcador{position:absolute;width:6px;height:64px;border-radius:3px;background:#00b7ff;pointer-events:none}
 
   /* menu de números do bloco */
-  /* menu de terreno do bloco "quando tocar" */
+  /* bolinha de terreno do bloco sensor (modo avançado) e menu de terreno */
+  .bloco .num.terreno{border-color:#c46a00;padding:2px 10px}
+  .bloco .num.terreno svg{width:100%;height:100%;display:block}
   #menuTerreno{position:fixed;z-index:25;display:none;grid-template-columns:repeat(3,56px);gap:8px;padding:8px;
     background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:3px solid #c46a00}
   #menuTerreno.aberto{display:grid}
@@ -192,9 +194,11 @@ const ICONES = {
   // chapéu de função: "f" grande (começo da sequência da função)
   funcao:   '<text x="44" y="46" font-size="38" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text>',
   // chamar função: "f" + seta "pula para lá"
-  // quando tocar: mãozinha + desenho do terreno (o desenho muda com o terreno do bloco)
-  tocar:    b => `<rect x="30" y="14" width="32" height="32" rx="7" fill="#fff"/>${MINI_TERRENO[b.terreno]}` +
-                 '<circle cx="28" cy="46" r="7" fill="#fff" stroke="#c46a00" stroke-width="2.5"/><circle cx="28" cy="46" r="2.5" fill="#c46a00"/>',
+  // sensor: no simplificado mostra o terreno (cada bloco é de um terreno);
+  // no avançado mostra ondas de sensor e o terreno vai na bolinha de baixo
+  sensor:   b => simples
+    ? `<rect x="30" y="14" width="32" height="32" rx="7" fill="#fff"/>${MINI_TERRENO[b.terreno]}`
+    : '<circle cx="30" cy="32" r="6" fill="#fff"/><path d="M39 21 A15 15 0 0 1 39 43 M46 15 A23 23 0 0 1 46 49" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>',
   chamar:   '<text x="28" y="46" font-size="34" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text><path d="M38 40 Q44 22 56 24" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M52 15 L62 25 L50 31 Z" fill="#fff"/>',
 };
 
@@ -207,8 +211,8 @@ const BLOCOS = {
   direita:  { grupo:'movimento', icone:'direita',  n:1 },
   funcao:   { grupo:'funcao',    icone:'funcao',   chapeu:true, cor:'vermelho' },
   chamar:   { grupo:'funcao',    icone:'chamar',   cor:'vermelho' },
-  // "quando o robô tocar em [terreno]": começo de uma reação (toque no bloco troca o terreno)
-  tocar:    { grupo:'evento',    icone:'tocar',    chapeu:true, terreno:'parede' },
+  // sensor: começo de uma reação que roda quando o robô toca no terreno do bloco
+  sensor:   { grupo:'evento',    icone:'sensor',   chapeu:true, terreno:'parede' },
 };
 const MOVIMENTOS = ['frente', 'tras', 'esquerda', 'direita'];
 
@@ -247,7 +251,9 @@ function criarBlocoEl(b) {
   el.innerHTML =
     `<svg viewBox="0 0 86 64"><path d="${def.chapeu ? FORMA_INICIO : FORMA_MEIO}"
        fill="${cor}" stroke="${borda}" stroke-width="3"/>${typeof ICONES[def.icone] === 'function' ? ICONES[def.icone](b) : ICONES[def.icone]}</svg>` +
-    (def.n !== undefined ? `<div class="num">${b.n}</div>` : '');
+    (def.n !== undefined ? `<div class="num">${b.n}</div>` : '') +
+    (def.terreno ? `<div class="num terreno"><svg viewBox="30 14 32 32">${MINI_TERRENO[b.terreno]}</svg></div>` : '');
+  if (b.terreno) el.dataset.terreno = b.terreno;
   return el;
 }
 
@@ -273,10 +279,12 @@ function desenhar() {
   salvarPrograma();
 }
 
-// o programa fica salvo no navegador: é o mesmo na página de programar e no construtor de cenários
+// o programa fica salvo no navegador. Página de programar e construtor de cenários têm
+// workspaces independentes: cada um guarda o seu programa.
+const chavePrograma = () => MODO_CENARIO ? 'programaCenario' : 'programa';
 function salvarPrograma() {
   const json = JSON.stringify({ cadeias, proxId });
-  try { localStorage.setItem('programa', json); } catch {}
+  try { localStorage.setItem(chavePrograma(), json); } catch {}
   registrarHistorico(json);
 }
 
@@ -316,8 +324,9 @@ function atualizarBotoesHistorico() {
 }
 function carregarPrograma() {
   try {
-    const p = JSON.parse(localStorage.getItem('programa') || 'null');
+    const p = JSON.parse(localStorage.getItem(chavePrograma()) || 'null');
     if (!p?.cadeias?.length) return;
+    for (const c of p.cadeias) for (const b of c.blocos || []) if (b.tipo === 'tocar') b.tipo = 'sensor';
     const validas = p.cadeias.filter(c => c.blocos?.length && c.blocos.every(b => BLOCOS[b.tipo]));
     if (!validas.length) return;
     cadeias = validas;
@@ -410,15 +419,17 @@ const valorN = b => simples ? 1 : b.n;
 const MODO_CENARIO = new URLSearchParams(location.search).get('modo') === 'cenario';
 if (MODO_CENARIO) document.body.classList.add('modo-cenario');
 
-// o bloco "quando tocar" aparece na paleta no construtor, ou se já existe um cenário montado
+// o bloco sensor aparece na paleta no construtor, ou se já existe um cenário montado.
+// Simplificado: um sensor para cada terreno. Avançado: um só, com o terreno na bolinha.
 const temCenario = () => { try { return Object.keys(JSON.parse(localStorage.getItem('cenario') || '{}')).length > 0; } catch { return false; } };
 
 function montarPaleta() {
   paleta.innerHTML = '';
   Object.keys(BLOCOS)
     .filter(t => !(simples && (t === 'play' || t === 'funcao')))
-    .filter(t => t !== 'tocar' || MODO_CENARIO || temCenario())
-    .forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor, terreno: BLOCOS[t].terreno })));
+    .filter(t => t !== 'sensor' || MODO_CENARIO || temCenario())
+    .flatMap(t => t === 'sensor' && simples ? TERRENOS.map(terreno => ({ t, terreno })) : [{ t, terreno: BLOCOS[t].terreno }])
+    .forEach(({ t, terreno }) => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor, terreno })));
 }
 
 function definirModoSimples(ligar) {
@@ -472,7 +483,7 @@ function luaDe(blocos, ind = '') {
   return linhas;
 }
 
-const cadeiaReacao = terreno => cadeias.find(c => c.blocos[0].tipo === 'tocar' && c.blocos[0].terreno === terreno);
+const cadeiaReacao = terreno => cadeias.find(c => c.blocos[0].tipo === 'sensor' && c.blocos[0].terreno === terreno);
 
 function gerarLua(soPlay) {
   const linhas = ['-- programa STEMEDU32'];
@@ -482,7 +493,7 @@ function gerarLua(soPlay) {
   }
   for (const t of TERRENOS) {
     const r = cadeiaReacao(t);
-    if (r) linhas.push('', `function ao_tocar_${t}()`, ...luaDe(r.blocos, '  '), 'end');
+    if (r) linhas.push('', `function sensor_${t}()`, ...luaDe(r.blocos, '  '), 'end');
   }
   for (const c of soPlay ? [soPlay] : cadeiasPlay()) linhas.push('', '-- play', ...luaDe(c.blocos));
   return linhas.join('\n');
@@ -508,7 +519,7 @@ document.addEventListener('pointerdown', e => {
   arraste = {
     daPaleta, el,
     ci: daPaleta ? -1 : +el.dataset.c, bi: daPaleta ? -1 : +el.dataset.b,
-    tipo: el.dataset.tipo,
+    tipo: el.dataset.tipo, terreno: el.dataset.terreno,
     x0: e.clientX, y0: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top,
     alvoNum: e.target.closest('.num'), fantasma: null,
   };
@@ -528,7 +539,7 @@ document.addEventListener('pointermove', e => {
       return;
     }
     // arrastar do meio de uma cadeia leva o bloco e todos os seguintes
-    a.blocos = a.daPaleta ? [novoBloco(a.tipo)] : cadeias[a.ci].blocos.slice(a.bi);
+    a.blocos = a.daPaleta ? [novoDaPaleta(a)] : cadeias[a.ci].blocos.slice(a.bi);
     a.fantasma = document.createElement('div');
     a.fantasma.className = 'fantasma';
     // bloco arrastado do workspace mantém o tamanho do zoom; da paleta, ganha o zoom do workspace
@@ -581,9 +592,11 @@ document.addEventListener('pointercancel', () => {
   arraste = null; esconderMarcador(); paleta.classList.remove('lixo'); desenhar();
 });
 
+const novoDaPaleta = a => novoBloco(a.tipo, a.terreno ? { terreno: a.terreno } : {});
+
 function tocar(a) {
   if (a.daPaleta) {                        // toque na paleta = adiciona no fim da última cadeia usada
-    const b = novoBloco(a.tipo);
+    const b = novoDaPaleta(a);
     if (BLOCOS[a.tipo].chapeu || !ultimaCadeia) {
       const y = Math.max(0, ...cadeias.map(c => c.y + ALT_BLOCO)) + 12;
       cadeias.push(ultimaCadeia = { x: 20, y, blocos: [b] });
@@ -595,7 +608,7 @@ function tocar(a) {
   const c = cadeias[a.ci], b = c.blocos[a.bi];
   ultimaCadeia = c;
   if (b.tipo === 'play') executar(c);
-  else if (b.tipo === 'tocar') abrirMenuTerreno(b, a.el);   // toque = menu para escolher o terreno
+  else if (b.tipo === 'sensor') { if (!simples && a.alvoNum) abrirMenuTerreno(b, a.alvoNum); }   // bolinha = menu de terreno
   else if (b.tipo === 'chamar' || (b.tipo === 'funcao' && !simples)) {   // toque = troca a cor
     b.cor = LISTA_CORES[(LISTA_CORES.indexOf(b.cor) + 1) % LISTA_CORES.length];
     desenhar();
@@ -638,7 +651,7 @@ document.addEventListener('pointerdown', e => {
 }, true);
 menuNumero.addEventListener('pointerdown', e => e.stopPropagation());
 
-// ---------- menu de terreno do bloco "quando tocar" (abre junto do bloco) ----------
+// ---------- menu de terreno do bloco sensor (abre junto da bolinha, no modo avançado) ----------
 const menuTerreno = document.getElementById('menuTerreno');
 for (const t of TERRENOS) {
   const bt = document.createElement('button');
@@ -648,12 +661,12 @@ for (const t of TERRENOS) {
 }
 let blocoTerreno = null;
 
-function abrirMenuTerreno(b, blocoEl) {
+function abrirMenuTerreno(b, alvoEl) {
   blocoTerreno = b;
   menuTerreno.querySelectorAll('button').forEach(bt => bt.classList.toggle('atual', bt.dataset.t === b.terreno));
   menuTerreno.classList.add('aberto');
-  // logo abaixo do bloco (ou acima, se não couber), sem sair da tela
-  const r = blocoEl.querySelector('svg').getBoundingClientRect(), m = menuTerreno.getBoundingClientRect();
+  // logo abaixo da bolinha (ou acima, se não couber), sem sair da tela
+  const r = alvoEl.getBoundingClientRect(), m = menuTerreno.getBoundingClientRect();
   let y = r.bottom + 6;
   if (y + m.height > innerHeight - 8) y = r.top - m.height - 6;
   menuTerreno.style.left = limitar(r.left + r.width / 2 - m.width / 2, 8, innerWidth - m.width - 8) + 'px';
@@ -858,7 +871,7 @@ addEventListener('message', ({ data }) => {
   if (data.tipo === 'passo') destacar(emExecucao[data.indice]?.id);
   if (data.tipo === 'fim') destacar(null);
   if (data.tipo === 'tocou') {
-    // o robô tocou num terreno: se existe "quando tocar" dele, a reação roda logo em seguida
+    // o robô tocou num terreno: se existe um sensor dele, a reação roda logo em seguida
     const r = cadeiaReacao(data.terreno);
     const cmds = r && reacoes++ < MAX_REACOES ? [{ cmd: 'pular', id: r.blocos[0].id }, ...comandos(r)] : [];
     emExecucao.splice(data.indice + 1, 0, ...cmds);   // mesma posição em que o simulador insere

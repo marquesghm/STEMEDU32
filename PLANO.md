@@ -76,12 +76,13 @@ Menu ☰ → **Construir cenário** abre `cenario.html`. Terrenos (uma casa cada
 | 💧 Água | robô afunda e o programa acaba | — |
 | 🟥🟦🟩 Chão colorido | nenhum | sim |
 
-Bloco laranja **"quando tocar em [terreno]"** (toque troca o terreno): chapéu cujos
-blocos rodam logo que o robô toca naquele terreno (interrompe o resto do comando atual).
-Lua: `function ao_tocar_<terreno>() ... end`.
+Bloco laranja **sensor**: chapéu cujos blocos rodam logo que o robô toca no terreno do bloco
+(interrompe o resto do comando atual). Simplificado: um sensor por terreno na paleta.
+Avançado: um sensor só, com o terreno na bolinha de baixo (toque abre menu).
+Lua: `function sensor_<terreno>() ... end`.
 
-Cenário (`localStorage.cenario`) e programa (`localStorage.programa`) ficam salvos no
-navegador e são os mesmos nas duas páginas.
+O cenário (`localStorage.cenario`) é o mesmo nas duas páginas. Os workspaces são
+independentes: `programa` (página de programar) e `programaCenario` (construtor).
 
 Mensagens extras simulador ↔ editor: `tocou {terreno, indice}` → `reagir {comandos}`
 (o simulador espera a resposta), `vitoria`, `caiu`, `cenarioMudou`.

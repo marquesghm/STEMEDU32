@@ -27,7 +27,8 @@ Poucos `.html`, cada um com seu HTML+CSS+JS, só o mínimo para separar sistemas
 | `cenario.html` | Construtor de cenários: junta simulador em edição + paleta de terrenos + editor |
 
 As páginas conversam por `postMessage` (mensagens descritas no PLANO.md).
-Programa e cenário ficam no `localStorage` (`programa`, `cenario`), compartilhados entre páginas.
+No `localStorage`: `cenario` (compartilhado), `programa` (página de programar) e `programaCenario`
+(construtor) — os workspaces das duas páginas são independentes.
 
 ## Convenções de código
 
