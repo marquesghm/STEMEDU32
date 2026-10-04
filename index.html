@@ -90,6 +90,15 @@
   .marcador{position:absolute;width:6px;height:64px;border-radius:3px;background:#00b7ff;pointer-events:none}
 
   /* menu de números do bloco */
+  /* menu de terreno do bloco "quando tocar" */
+  #menuTerreno{position:fixed;z-index:25;display:none;grid-template-columns:repeat(3,56px);gap:8px;padding:8px;
+    background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:3px solid #c46a00}
+  #menuTerreno.aberto{display:grid}
+  #menuTerreno button{width:56px;height:56px;border-radius:14px;border:3px solid #f5d2a3;background:#fff;
+    cursor:pointer;padding:6px}
+  #menuTerreno button svg{width:100%;height:100%;display:block}
+  #menuTerreno button.atual{border-color:#ff9d1a;background:#fff3e0}
+  #menuTerreno button:active{transform:scale(.92)}
   #menuNumero{position:fixed;z-index:25;display:none;grid-template-columns:repeat(5,44px);gap:6px;padding:8px;
     background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:3px solid var(--rosa-esc)}
   #menuNumero.aberto{display:grid}
@@ -136,6 +145,7 @@
 <div id="paleta"></div>
 
 <div id="menuNumero"></div>
+<div id="menuTerreno"></div>
 <pre id="lua"></pre>
 <div id="aviso"></div>
 
@@ -585,10 +595,7 @@ function tocar(a) {
   const c = cadeias[a.ci], b = c.blocos[a.bi];
   ultimaCadeia = c;
   if (b.tipo === 'play') executar(c);
-  else if (b.tipo === 'tocar') {                           // toque = troca o terreno
-    b.terreno = TERRENOS[(TERRENOS.indexOf(b.terreno) + 1) % TERRENOS.length];
-    desenhar();
-  }
+  else if (b.tipo === 'tocar') abrirMenuTerreno(b, a.el);   // toque = menu para escolher o terreno
   else if (b.tipo === 'chamar' || (b.tipo === 'funcao' && !simples)) {   // toque = troca a cor
     b.cor = LISTA_CORES[(LISTA_CORES.indexOf(b.cor) + 1) % LISTA_CORES.length];
     desenhar();
@@ -630,6 +637,41 @@ document.addEventListener('pointerdown', e => {
   if (blocoDoMenu && !menuNumero.contains(e.target)) fecharMenuNumero();
 }, true);
 menuNumero.addEventListener('pointerdown', e => e.stopPropagation());
+
+// ---------- menu de terreno do bloco "quando tocar" (abre junto do bloco) ----------
+const menuTerreno = document.getElementById('menuTerreno');
+for (const t of TERRENOS) {
+  const bt = document.createElement('button');
+  bt.dataset.t = t;
+  bt.innerHTML = `<svg viewBox="30 14 32 32">${MINI_TERRENO[t]}</svg>`;
+  menuTerreno.appendChild(bt);
+}
+let blocoTerreno = null;
+
+function abrirMenuTerreno(b, blocoEl) {
+  blocoTerreno = b;
+  menuTerreno.querySelectorAll('button').forEach(bt => bt.classList.toggle('atual', bt.dataset.t === b.terreno));
+  menuTerreno.classList.add('aberto');
+  // logo abaixo do bloco (ou acima, se não couber), sem sair da tela
+  const r = blocoEl.querySelector('svg').getBoundingClientRect(), m = menuTerreno.getBoundingClientRect();
+  let y = r.bottom + 6;
+  if (y + m.height > innerHeight - 8) y = r.top - m.height - 6;
+  menuTerreno.style.left = limitar(r.left + r.width / 2 - m.width / 2, 8, innerWidth - m.width - 8) + 'px';
+  menuTerreno.style.top = Math.max(8, y) + 'px';
+}
+function fecharMenuTerreno() { menuTerreno.classList.remove('aberto'); blocoTerreno = null; }
+
+menuTerreno.addEventListener('click', e => {
+  const bt = e.target.closest('button');
+  if (!bt || !blocoTerreno) return;
+  blocoTerreno.terreno = bt.dataset.t;
+  fecharMenuTerreno();
+  desenhar();
+});
+document.addEventListener('pointerdown', e => {
+  if (blocoTerreno && !menuTerreno.contains(e.target)) fecharMenuTerreno();
+}, true);
+menuTerreno.addEventListener('pointerdown', e => e.stopPropagation());
 
 const sobrePaleta = e => e.clientY > paleta.getBoundingClientRect().top;
 
