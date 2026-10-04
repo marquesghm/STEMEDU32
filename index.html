@@ -694,7 +694,7 @@ function atualizarMinimapa() {
   const w = ws.clientWidth, h = ws.clientHeight;
   // parte visível, em coordenadas do workspace
   const vx0 = -vistaX / zoom, vy0 = -vistaY / zoom, vx1 = vx0 + w / zoom, vy1 = vy0 + h / zoom;
-  const oculto = cadeias.some(c => c.x < vx0 || c.x + larguraCadeia(c) > vx1 || c.y < vy0 || c.y + ALT_BLOCO > vy1);
+  const oculto = algumBlocoOculto();
   minimapa.classList.toggle('visivel', oculto && cadeias.length > 0);
   if (!oculto) return;
 
@@ -730,10 +730,19 @@ function animarVista(x1, y1, z1) {
 }
 
 // zoom out (nunca aproxima além de 1x) até todos os blocos caberem, centralizados
-function verTudo() {
+function verTudo(animado = true) {
   const b = caixaBlocos(), m = 20, w = ws.clientWidth, h = ws.clientHeight;
   const z = limitar(Math.min((w - 2 * m) / (b.x1 - b.x0), (h - 2 * m) / (b.y1 - b.y0), 1), ZOOM_MIN, 1);
-  animarVista((w - (b.x0 + b.x1) * z) / 2, (h - (b.y0 + b.y1) * z) / 2, z);
+  const x = (w - (b.x0 + b.x1) * z) / 2, y = (h - (b.y0 + b.y1) * z) / 2;
+  if (animado) animarVista(x, y, z);
+  else { vistaX = x; vistaY = y; zoom = z; desenharVista(); }
+}
+
+// algum bloco (mesmo que só um pedaço) está fora da parte visível do workspace?
+function algumBlocoOculto() {
+  const vx0 = -vistaX / zoom, vy0 = -vistaY / zoom;
+  const vx1 = vx0 + ws.clientWidth / zoom, vy1 = vy0 + ws.clientHeight / zoom;
+  return cadeias.some(c => c.x < vx0 || c.x + larguraCadeia(c) > vx1 || c.y < vy0 || c.y + ALT_BLOCO > vy1);
 }
 
 minimapa.addEventListener('pointerdown', e => e.stopPropagation());
@@ -916,6 +925,9 @@ let modoSalvo = null;
 try { modoSalvo = localStorage.getItem('modo'); } catch {}
 carregarPrograma();
 definirModoSimples(modoSalvo !== 'avancado');
+// ao abrir a página (ou trocar de página), se algum bloco ficou escondido, já abre afastado mostrando todos
+// (sem animação: a página já aparece assim, sem movimento que a criança não pediu)
+addEventListener('load', () => { if (algumBlocoOculto()) verTudo(false); });
 </script>
 </body>
 </html>
