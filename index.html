@@ -432,6 +432,8 @@ function gerarLua(soPlay) {
 // 5. INTERAÇÃO: tocar e arrastar (pointer events = mouse + toque)
 // =====================================================================
 let arraste = null;
+// ângulo mínimo (graus acima da horizontal) para um movimento na paleta pegar o bloco em vez de rolar
+const ANGULO_PEGAR = 20;
 let marcador = null;
 
 document.addEventListener('pointerdown', e => {
@@ -459,8 +461,9 @@ document.addEventListener('pointermove', e => {
   if (!a.fantasma) {
     const mx = e.clientX - a.x0, my = e.clientY - a.y0;
     if (Math.hypot(mx, my) < 8) return;
-    // na paleta: puxar para cima pega o bloco; qualquer outro movimento rola a paleta
-    if (a.daPaleta && !(a.el && my < 0 && -my > Math.abs(mx))) {
+    // na paleta: puxar para cima (até bem na diagonal) pega o bloco; quase na horizontal rola a paleta
+    const subindo = my < 0 && -my > Math.abs(mx) * Math.tan(ANGULO_PEGAR * Math.PI / 180);
+    if (a.daPaleta && !(a.el && subindo)) {
       a.rolando = true; a.sl0 = paleta.scrollLeft; a.x0 = e.clientX;
       return;
     }
