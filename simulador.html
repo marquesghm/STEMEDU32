@@ -361,7 +361,7 @@ function reiniciar() {
   lampada(false);
   apagarPisos();
   estrelasPegas = new Set();
-  paredeNaFrente = temParedeNaFrente();   // parede que já está na frente no começo não conta
+  paredeNaFrente = false;   // se já começar de frente para uma parede, o sensor dispara logo no início
   for (const m of Object.values(malhas)) m.visible = true;
   rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
 }

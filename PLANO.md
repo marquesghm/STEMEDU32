@@ -72,7 +72,7 @@ Menu ☰ → **Construir cenário** abre `cenario.html`. Terrenos (uma casa cada
 
 | Terreno | Efeito pronto | Reação programável |
 |---|---|---|
-| 🧱 Parede | robô bate e não entra | sim: dispara quando aparece parede na casa da frente (após andar/girar) |
+| 🧱 Parede | robô bate e não entra | sim: dispara quando aparece parede na casa da frente (no início, ou após andar/girar) |
 | ⭐ Estrela | é coletada; todas = desafio completo | sim |
 | 💧 Água | robô afunda e o programa acaba | — |
 | 🟥🟦🟩 Chão colorido | nenhum | sim |
