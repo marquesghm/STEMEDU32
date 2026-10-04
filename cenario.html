@@ -107,7 +107,13 @@ addEventListener('message', ({ source, data }) => {
   if (!data?.tipo) return;
   if (data.tipo === 'toqueSim') { menuRobo.classList.remove('aberto'); return; }
   if (data.tipo === 'menuRobo') { abrirMenuRobo(data); return; }
-  if (data.tipo === 'historico') return;   // histórico dos blocos (do editor) não é usado aqui
+  if (data.tipo === 'historico') return;
+  if (data.tipo === 'estadoPlay') {   // ▶ / ⏭ segue o estado do editor
+    const bt = document.getElementById('btnPlay');
+    bt.textContent = data.estado === 'parado' ? '▶' : '⏭\uFE0E';
+    bt.title = data.estado === 'parado' ? 'Testar' : 'Passo a passo';
+    return;
+  }   // histórico dos blocos (do editor) não é usado aqui
   if (data.tipo === 'historicoCenario') {  // o simulador avisa o que dá para desfazer/refazer nos terrenos
     document.getElementById('cBtnDesfazer').disabled = !data.podeDesfazer;
     document.getElementById('cBtnRefazer').classList.toggle('visivel', data.podeRefazer);

@@ -387,6 +387,7 @@ function reiniciar() {
   apagarPisos();
   estrelasPegas = new Set();
   pendentes = []; ofsReacao = 0;
+  modoPasso = false; pausado = false; liberados = 0;
   paredeNaFrente = false;   // se já começar de frente para uma parede, o sensor dispara logo no início
   for (const m of Object.values(malhas)) m.visible = true;
   rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
@@ -412,10 +413,16 @@ function verificarFrente() {
 
 // Sensores "esperam a vez": o que o robô tocar durante um comando fica guardado e as
 // reações rodam só quando o comando termina (nunca no meio dele), na ordem em que aconteceram.
+// Passo a passo: em modoPasso, o simulador pausa antes de cada bloco e espera 'avancar'.
+let modoPasso = false, pausado = false, liberados = 0;
 let pendentes = [];      // terrenos tocados durante o comando atual
 let ofsReacao = 0;       // comandos de reação já inseridos depois do comando atual
 
 function proximo() {
+  if (modoPasso && !pendentes.length) {
+    if (liberados <= 0) { pausado = true; atual = { tipo: 'aguardando' }; return; }
+    liberados--;
+  }
   if (pendentes.length) { tocou(pendentes.shift()); return; }
   ofsReacao = 0;
   if (verificarFrente()) return;   // reação de parede roda antes do próximo comando
@@ -547,6 +554,11 @@ addEventListener('message', ({ data }) => {
     if (!tocarCasaAtual()) proximo();   // terreno embaixo do robô na saída também conta
   }
   else if (data.tipo === 'parar') { fila = []; atual = null; }
+  else if (data.tipo === 'modoPasso') { modoPasso = true; liberados = 0; }
+  else if (data.tipo === 'avancar') {
+    if (pausado) { pausado = false; liberados = 1; proximo(); }
+    else liberados = 1;   // ainda terminando o bloco atual: o próximo já está liberado
+  }
   else if (data.tipo === 'reiniciar') reiniciar();
   else if (data.tipo === 'reagir' && atual?.tipo === 'aguardando') {
     // reação entra logo depois do comando atual (o resto do comando atual é interrompido)

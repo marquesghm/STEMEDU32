@@ -934,7 +934,7 @@ addEventListener('message', ({ data }) => {
     else if (c && !idsReacao.has(c.id)) idsReacao = new Set();
     wsInterno.querySelectorAll('.bloco').forEach(el => el.classList.toggle('disparou', idsReacao.has(+el.dataset.id) && el === el.parentNode.firstChild));
   }
-  if (data.tipo === 'fim') { destacar(null); idsReacao = new Set(); wsInterno.querySelectorAll('.disparou').forEach(el => el.classList.remove('disparou')); }
+  if (data.tipo === 'fim') { definirEstadoPlay('parado'); destacar(null); idsReacao = new Set(); wsInterno.querySelectorAll('.disparou').forEach(el => el.classList.remove('disparou')); }
   if (data.tipo === 'tocou') {
     // o robô tocou num terreno: se existe um sensor dele, a reação roda logo em seguida
     const r = cadeiaReacao(data.terreno);
@@ -947,7 +947,7 @@ addEventListener('message', ({ data }) => {
   if (data.tipo === 'caiu') aviso('💦 O robô caiu na água!');
   if (data.tipo === 'cenarioMudou') montarPaleta();
   // comandos vindos do construtor de cenários (botões do header dele)
-  if (data.tipo === 'executarTodos') executarTodos();
+  if (data.tipo === 'executarTodos') apertarPlay();   // ▶/⏭ do construtor
   if (data.tipo === 'desfazer') desfazer();
   if (data.tipo === 'refazer') refazer();
   if (data.tipo === 'pararTudo') document.getElementById('btnParar').click();
@@ -962,6 +962,7 @@ function executar(cadeia) {
   emExecucao = comandos(cadeia);
   destacar(cadeia.blocos[0].id);
   paraSim({ tipo: 'executar', comandos: emExecucao.map(({ cmd, n }) => ({ cmd, n })) });
+  definirEstadoPlay('rodando');
   if (porta) enviarParaRobo(cadeia);
 }
 
@@ -972,14 +973,33 @@ function executarTodos() {
   reacoes = 0;
   emExecucao = plays.flatMap(c => [{ cmd: 'pular', id: c.blocos[0].id }, ...comandos(c)]);
   paraSim({ tipo: 'executar', comandos: emExecucao.map(({ cmd, n }) => ({ cmd, n })) });
+  definirEstadoPlay('rodando');
   if (porta) enviarParaRobo();
 }
 
-document.getElementById('btnPlay').onclick = executarTodos;
+// ---------- botão ▶ / ⏭ (passo a passo) ----------
+// parado: ▶ inicia e o botão vira ⏭. Rodando: ⏭ pausa no fim do bloco atual (modo passo).
+// Em modo passo: cada ⏭ executa o próximo bloco e pausa. No fim (ou ⏹) volta a ▶.
+let estadoPlay = 'parado';
+function definirEstadoPlay(e) {
+  estadoPlay = e;
+  const bt = document.getElementById('btnPlay');
+  bt.textContent = e === 'parado' ? '▶' : '⏭\uFE0E';
+  bt.title = e === 'parado' ? 'Executar' : 'Passo a passo';
+  if (MODO_CENARIO) parent.postMessage({ tipo: 'estadoPlay', estado: e }, '*');
+}
+function apertarPlay() {
+  if (estadoPlay === 'parado') executarTodos();
+  else if (estadoPlay === 'rodando') { paraSim({ tipo: 'modoPasso' }); definirEstadoPlay('passo'); }
+  else paraSim({ tipo: 'avancar' });
+}
+
+document.getElementById('btnPlay').onclick = apertarPlay;
 document.getElementById('btnDesfazer').onclick = desfazer;
 document.getElementById('btnRefazer').onclick = refazer;
 document.getElementById('btnParar').onclick = () => {
   paraSim({ tipo: 'reiniciar' }); destacar(null);
+  definirEstadoPlay('parado');
   if (porta) escreverLinha('parar');
 };
 
