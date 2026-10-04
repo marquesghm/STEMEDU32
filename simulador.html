@@ -36,8 +36,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const PASSO = 1;          // 1 unidade de grade por "frente(1)"
-const VEL_MOVE = 1.6;     // unidades / s
-const VEL_GIRO = Math.PI; // rad / s
+// tempo de cada passo (andar 1 casa ou girar 90°), em segundos: vem das Configurações
+let TEMPO_PASSO = 0.6;
+function lerConfig() {
+  try { TEMPO_PASSO = JSON.parse(localStorage.getItem('config') || '{}').passo || 0.6; } catch {}
+}
 // o robô começa de costas para a câmera (olhando para -Z): "frente" afasta ele de quem olha
 const ROT_INICIAL = Math.PI;
 
@@ -440,7 +443,7 @@ function proximo() {
   } else if (cmd === 'esquerda' || cmd === 'direita') {
     const ang = (cmd === 'esquerda' ? 1 : -1) * n * Math.PI / 2;
     atual = { tipo: 'girar', de: robo.rotation.y, para: robo.rotation.y + ang, t: 0,
-              dur: Math.max(0.1, Math.abs(ang) / VEL_GIRO) };
+              dur: Math.max(0.1, Math.abs(ang) / (Math.PI / 2) * TEMPO_PASSO) };
   } else if (cmd === 'sensor') {       // começo de uma reação: pausa para a criança ver o salto
     atual = { tipo: 'espera', t: 0, dur: 0.7 };
   } else {
@@ -459,7 +462,7 @@ function andarUmaCasa(sentido, restam) {
     atual = { tipo: 'bater', de, para: de.clone().lerp(para, 0.3), t: 0, dur: 0.35 };
     return;
   }
-  atual = { tipo: 'mover', de, para, t: 0, dur: PASSO / VEL_MOVE, sentido, restam: restam - 1 };
+  atual = { tipo: 'mover', de, para, t: 0, dur: TEMPO_PASSO, sentido, restam: restam - 1 };
 }
 
 function chegouNaCasa(a) {
@@ -550,6 +553,7 @@ addEventListener('resize', redimensionar);
 addEventListener('message', ({ data }) => {
   if (!data || !data.tipo) return;
   if (data.tipo === 'executar') {
+    lerConfig();
     reiniciar(); fila = data.comandos || [];
     if (!tocarCasaAtual()) proximo();   // terreno embaixo do robô na saída também conta
   }

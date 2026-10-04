@@ -57,6 +57,11 @@ Nos blocos de função, um toque troca a cor. O "chamar" pula para a sequência
 que começa com a função da mesma cor e depois volta (máx. 8 níveis, para
 proteger contra função que chama a si mesma).
 
+## Configurações (menu ☰)
+- 💡 Tempo da lâmpada acesa no modo simplificado: 0,25 / 0,5 / 1 / 2 s
+- 🐢 Tempo de cada passo do robô (andar 1 casa ou girar 90°): 0,3 / 0,6 / 1 / 1,5 s
+Salvas em `localStorage.config`; o simulador lê ao iniciar cada execução.
+
 ## Workspace
 Folha grande de tamanho fixo (4000×3000 px); a vista e os blocos não passam da borda.
 Cada sequência (cadeia) tem posição própria.
