@@ -113,8 +113,8 @@
   #menuFuncao{position:fixed;z-index:26;display:none;grid-template-columns:repeat(2,76px);gap:6px;padding:8px;
     background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:3px solid #777}
   #menuFuncao.aberto{display:grid}
-  #menuFuncao button{width:76px;height:56px;border:3px solid transparent;border-radius:14px;color:#fff;
-    font:700 15px system-ui;cursor:pointer}
+  #menuFuncao button{width:76px;height:56px;padding:0;border:3px solid transparent;border-radius:14px;background:#fff;cursor:pointer}
+  #menuFuncao button svg{display:block;width:70px;height:50px}
   #menuFuncao button.atual{outline:3px solid #333;outline-offset:1px}
   .modal-projeto{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:#0006}
   .modal-projeto.aberto{display:flex}
@@ -781,11 +781,12 @@ menuTerreno.addEventListener('pointerdown', e => e.stopPropagation());
 
 // Início e chamada de função compartilham a mesma escolha explícita de cor.
 const menuFuncao = document.getElementById('menuFuncao');
-const NOMES_CORES = { vermelho:'Vermelha', azul:'Azul', verde:'Verde', roxo:'Roxa' };
 for (const cor of LISTA_CORES) {
   const bt = document.createElement('button');
-  bt.type = 'button'; bt.dataset.cor = cor; bt.textContent = NOMES_CORES[cor];
-  bt.style.background = CORES_FUNCAO[cor][0];
+  const [corBase, corBorda] = CORES_FUNCAO[cor];
+  bt.type = 'button'; bt.dataset.cor = cor;
+  bt.setAttribute('aria-label', `Bloco de chamada da função ${cor}`);
+  bt.innerHTML = `<svg viewBox="0 0 86 64" aria-hidden="true"><path d="${FORMA_MEIO}" fill="${corBase}" stroke="${corBorda}" stroke-width="3"/>${ICONES.chamar}</svg>`;
   menuFuncao.appendChild(bt);
 }
 let blocoFuncao = null;
