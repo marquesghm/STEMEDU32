@@ -141,13 +141,16 @@ const CORES_FUNCAO = {
 };
 const LISTA_CORES = Object.keys(CORES_FUNCAO);
 
+const GIRO = '<path d="M47.2 41.2 A13 13 0 1 0 25 32" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>' +
+             '<path d="M16 31 H34 L25 44 Z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>';
 // ícones desenhados em SVG (centro do bloco ~ x=36, y=32)
 const ICONES = {
   play:     '<path d="M30 18 L52 32 L30 46 Z" fill="#3ec43e" stroke="#1d7a1d" stroke-width="3" stroke-linejoin="round"/>',
   frente:   '<path d="M36 14 L50 30 H41 V50 H31 V30 H22 Z" fill="#fff"/>',
   tras:     '<path d="M36 50 L50 34 H41 V14 H31 V34 H22 Z" fill="#fff"/>',
-  esquerda: '<path d="M46 44 A13 13 0 1 0 26 30" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M17 26 L28 18 L32 32 Z" fill="#fff"/>',
-  direita:  '<path d="M26 44 A13 13 0 1 1 46 30" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M55 26 L44 18 L40 32 Z" fill="#fff"/>',
+  // giro: arco (centro 38,32 raio 13) que termina dentro da ponta da seta, apontando na direção da curva
+  esquerda: GIRO,
+  direita:  `<g transform="translate(72 0) scale(-1 1)">${GIRO}</g>`,   // espelho da esquerda
   // chapéu de função: "f" grande (começo da sequência da função)
   funcao:   '<text x="44" y="46" font-size="38" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text>',
   // chamar função: "f" + seta "pula para lá"
