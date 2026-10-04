@@ -300,7 +300,7 @@ function pintar(ev) {
   const k = chaveCasa(c.x, c.z);
   if (k === ultimaCasa) return;
   ultimaCasa = k;
-  if (c.x === 0 && c.z === 0 && ferramenta !== 'apagar') return;   // casa de saída do robô fica livre
+  if (c.x === 0 && c.z === 0 && ferramenta === 'parede') return;   // casa de saída do robô não pode ter parede
   if (ferramenta === 'apagar') delete cenario[k]; else cenario[k] = ferramenta;
   desenharCenario();
   salvarCenario();
@@ -434,12 +434,19 @@ function andarUmaCasa(sentido, restam) {
 function chegouNaCasa(a) {
   robo.position.y = 0;
   rastroPts.push(robo.position.clone().setY(0.03)); atualizarRastro();
+  if (tocarCasaAtual()) return;   // afundou
+  if (a.restam > 0) andarUmaCasa(a.sentido, a.restam); else proximo();
+}
+
+// efeito do terreno da casa onde o robô está (ao chegar nela, ou na casa de saída no começo).
+// Devolve true se o robô caiu na água (o programa acaba).
+function tocarCasaAtual() {
   const k = chaveCasa(Math.round(robo.position.x), Math.round(robo.position.z));
   let tipo = estrelasPegas.has(k) ? null : cenario[k];
   if (tipo === 'chao_preto' && pisosAcesos.has(k)) tipo = 'chao_amarelo';
   if (tipo === 'agua') {   // caiu na água: afunda e o programa acaba
     atual = { tipo: 'afundar', t: 0, dur: 0.6 };
-    return;
+    return true;
   }
   if (tipo === 'estrela') {
     estrelasPegas.add(k);
@@ -448,7 +455,7 @@ function chegouNaCasa(a) {
     if (estrelasPegas.size === total) parent.postMessage({ tipo: 'vitoria' }, '*');
   }
   if (tipo) pendentes.push(tipo);   // a reação espera o comando terminar
-  if (a.restam > 0) andarUmaCasa(a.sentido, a.restam); else proximo();
+  return false;
 }
 
 // pausa e pergunta à página se há reação para esse terreno.
@@ -511,7 +518,10 @@ addEventListener('resize', redimensionar);
 
 addEventListener('message', ({ data }) => {
   if (!data || !data.tipo) return;
-  if (data.tipo === 'executar') { reiniciar(); fila = data.comandos || []; proximo(); }
+  if (data.tipo === 'executar') {
+    reiniciar(); fila = data.comandos || [];
+    if (!tocarCasaAtual()) proximo();   // terreno embaixo do robô na saída também conta
+  }
   else if (data.tipo === 'parar') { fila = []; atual = null; }
   else if (data.tipo === 'reiniciar') reiniciar();
   else if (data.tipo === 'reagir' && atual?.tipo === 'aguardando') {
