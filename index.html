@@ -41,6 +41,10 @@
     background-image:radial-gradient(#e6dcc0 1.5px,transparent 1.5px);background-size:24px 24px;
     touch-action:none;cursor:move}
   #wsInterno{position:absolute;left:0;top:0;width:0;height:0;will-change:transform;transform-origin:0 0}
+  #minimapa{position:absolute;right:8px;top:8px;width:96px;height:64px;border-radius:8px;z-index:3;
+    background:rgba(255,255,255,.6);border:1.5px solid rgba(0,0,0,.15);opacity:0;pointer-events:none;
+    transition:opacity .2s;cursor:zoom-out}
+  #minimapa.visivel{opacity:.85;pointer-events:auto}
   .cadeia{position:absolute;display:flex;align-items:flex-start}
 
   /* paleta */
@@ -82,7 +86,7 @@
 <div id="sim"><iframe id="simFrame" src="simulador.html" title="Simulador 3D"></iframe></div>
 
 <div id="divisor" title="Arraste para mudar o tamanho"></div>
-<div id="ws"><div id="wsInterno"></div></div>
+<div id="ws"><div id="wsInterno"></div><canvas id="minimapa" title="Ver todos os blocos"></canvas></div>
 <div id="paleta"></div>
 
 <pre id="lua"></pre>
@@ -244,6 +248,7 @@ function desenharVista() {
   wsInterno.style.transform = `translate(${vistaX}px, ${vistaY}px) scale(${zoom})`;
   ws.style.backgroundPosition = `${vistaX}px ${vistaY}px`;   // pontinhos acompanham
   ws.style.backgroundSize = `${24 * zoom}px ${24 * zoom}px`;
+  atualizarMinimapa();
 }
 
 function aplicarVista() {
@@ -370,8 +375,6 @@ document.addEventListener('pointermove', e => {
   const fx = e.clientX - a.dx, fy = e.clientY - a.dy;
   a.fantasma.style.left = fx + 'px';
   a.fantasma.style.top  = fy + 'px';
-  if (!a.ux) iniciarRolagemBorda();
-  a.ux = e.clientX; a.uy = e.clientY;      // última posição do dedo (usada pela rolagem na borda)
   paleta.classList.toggle('lixo', !a.daPaleta && sobrePaleta(e));
   mostrarMarcador(sobrePaleta(e) ? null : acharEncaixe(fx, fy, a));
 });
@@ -529,33 +532,66 @@ ws.addEventListener('wheel', e => {
   } else moverVista(-(e.shiftKey ? e.deltaY : e.deltaX), e.shiftKey ? 0 : -e.deltaY);
 }, { passive: false });
 
-// Enquanto arrasta um bloco e o dedo FICA parado perto da borda, a vista anda sozinha.
-// Regras para não atrapalhar o encaixe:
-//  - só depois que o dedo entrou no miolo do workspace (vindo da paleta, atravessar a borda de baixo não conta)
-//  - só depois de ~0,6 s parado na faixa da borda (passar por ela não rola)
-//  - nunca enquanto há um encaixe sendo mostrado
-const BORDA = 28, ESPERA_BORDA = 600, VEL_BORDA = 6;
-let timerBorda = 0;
+// ---------- minimapa: aparece quando algum bloco ficou fora da tela ----------
+// Tocar nele afasta o zoom até todos os blocos caberem.
+const minimapa = document.getElementById('minimapa'), ctxMini = minimapa.getContext('2d');
+const MINI_L = 96, MINI_A = 64;
 
-function rolarNaBorda(a) {
-  const r = ws.getBoundingClientRect(), x = a.ux, y = a.uy;
-  const dentro = y > r.top && y < r.bottom && x > r.left && x < r.right;
-  const naBorda = dentro && (x < r.left + BORDA || x > r.right - BORDA || y < r.top + BORDA || y > r.bottom - BORDA);
-  if (dentro && !naBorda) a.entrouNoMeio = true;
-  if (!naBorda || !a.entrouNoMeio || marcador) { a.bordaDesde = 0; return; }
-  const agora = performance.now();
-  if (!a.bordaDesde) { a.bordaDesde = agora; return; }
-  if (agora - a.bordaDesde < ESPERA_BORDA) return;
-  moverVista(x < r.left + BORDA ? VEL_BORDA : x > r.right - BORDA ? -VEL_BORDA : 0,
-             y < r.top + BORDA ? VEL_BORDA : y > r.bottom - BORDA ? -VEL_BORDA : 0);
-  // a vista andou: o fantasma está parado na tela, mas o encaixe embaixo dele mudou
-  mostrarMarcador(acharEncaixe(parseFloat(a.fantasma.style.left), parseFloat(a.fantasma.style.top), a));
+function caixaBlocos() {
+  return {
+    x0: Math.min(...cadeias.map(c => c.x)), x1: Math.max(...cadeias.map(c => c.x + larguraCadeia(c))),
+    y0: Math.min(...cadeias.map(c => c.y)), y1: Math.max(...cadeias.map(c => c.y + ALT_BLOCO)),
+  };
 }
 
-function iniciarRolagemBorda() {
-  clearInterval(timerBorda);
-  timerBorda = setInterval(() => { if (arraste?.fantasma) rolarNaBorda(arraste); else clearInterval(timerBorda); }, 16);
+function atualizarMinimapa() {
+  const w = ws.clientWidth, h = ws.clientHeight;
+  // parte visível, em coordenadas do workspace
+  const vx0 = -vistaX / zoom, vy0 = -vistaY / zoom, vx1 = vx0 + w / zoom, vy1 = vy0 + h / zoom;
+  const oculto = cadeias.some(c => c.x < vx0 || c.x + larguraCadeia(c) > vx1 || c.y < vy0 || c.y + ALT_BLOCO > vy1);
+  minimapa.classList.toggle('visivel', oculto && cadeias.length > 0);
+  if (!oculto) return;
+
+  // escala que faz caber blocos + área visível dentro do minimapa
+  const b = caixaBlocos();
+  const x0 = Math.min(b.x0, vx0), x1 = Math.max(b.x1, vx1), y0 = Math.min(b.y0, vy0), y1 = Math.max(b.y1, vy1);
+  const dpr = devicePixelRatio || 1;
+  minimapa.width = MINI_L * dpr; minimapa.height = MINI_A * dpr;
+  const m = 4, k = Math.min((MINI_L - 2 * m) / (x1 - x0), (MINI_A - 2 * m) / (y1 - y0));
+  const ox = m + ((MINI_L - 2 * m) - (x1 - x0) * k) / 2 - x0 * k, oy = m + ((MINI_A - 2 * m) - (y1 - y0) * k) / 2 - y0 * k;
+  ctxMini.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctxMini.clearRect(0, 0, MINI_L, MINI_A);
+  for (const c of cadeias) {   // cada cadeia vira um retângulo com a cor do 1º bloco
+    const def = BLOCOS[c.blocos[0].tipo];
+    ctxMini.fillStyle = def.grupo === 'funcao' ? CORES_FUNCAO[c.blocos[0].cor][0] : getComputedStyle(document.body).getPropertyValue(def.grupo === 'inicio' ? '--amarelo' : '--rosa');
+    ctxMini.fillRect(ox + c.x * k, oy + c.y * k, Math.max(2, larguraCadeia(c) * k), Math.max(2, 64 * k));
+  }
+  ctxMini.strokeStyle = '#00a2e8'; ctxMini.lineWidth = 1.5;   // retângulo = o que está na tela
+  ctxMini.strokeRect(ox + vx0 * k, oy + vy0 * k, (vx1 - vx0) * k, (vy1 - vy0) * k);
 }
+
+// anima a vista até (x, y, z)
+function animarVista(x1, y1, z1) {
+  const x0 = vistaX, y0 = vistaY, z0 = zoom, t0 = performance.now(), dur = 400;
+  cancelAnimationFrame(animVolta);
+  const passo = agora => {
+    const k = Math.min(1, (agora - t0) / dur), e = 1 - (1 - k) ** 3;
+    vistaX = x0 + (x1 - x0) * e; vistaY = y0 + (y1 - y0) * e; zoom = z0 + (z1 - z0) * e;
+    desenharVista();
+    if (k < 1) animVolta = requestAnimationFrame(passo);
+  };
+  animVolta = requestAnimationFrame(passo);
+}
+
+// zoom out (nunca aproxima além de 1x) até todos os blocos caberem, centralizados
+function verTudo() {
+  const b = caixaBlocos(), m = 20, w = ws.clientWidth, h = ws.clientHeight;
+  const z = limitar(Math.min((w - 2 * m) / (b.x1 - b.x0), (h - 2 * m) / (b.y1 - b.y0), 1), ZOOM_MIN, 1);
+  animarVista((w - (b.x0 + b.x1) * z) / 2, (h - (b.y0 + b.y1) * z) / 2, z);
+}
+
+minimapa.addEventListener('pointerdown', e => e.stopPropagation());
+minimapa.addEventListener('click', verTudo);
 
 // =====================================================================
 // 6. SIMULADOR (iframe) — conversa por postMessage
