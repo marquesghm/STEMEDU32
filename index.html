@@ -246,7 +246,9 @@ const ENCAIXE = 40;        // distância (px) para "grudar" num encaixe
 let proxId = 1;
 const novoBloco = (tipo, extra = {}) => ({ id: proxId++, tipo, n: BLOCOS[tipo].n, cor: BLOCOS[tipo].cor, terreno: BLOCOS[tipo].terreno, ...extra });
 
-let cadeias = [ { x: 20, y: 20, blocos: [ novoBloco('play') ] } ];
+// a folha do workspace tem 4000x3000; o programa começa no meio dela (espaço para todos os lados)
+const INICIO_X = 1800, INICIO_Y = 1400;
+let cadeias = [ { x: INICIO_X, y: INICIO_Y, blocos: [ novoBloco('play') ] } ];
 let ultimaCadeia = cadeias[0];   // onde o toque na paleta adiciona
 
 const ws = document.getElementById('ws');
@@ -350,6 +352,22 @@ function carregarPrograma() {
   } catch {}
 }
 
+// leva o programa para o meio da folha, se estiver encostado numa borda (programas antigos)
+function centralizarPrograma() {
+  if (!cadeias.length) return;
+  const b = caixaBlocos(), margem = 600;
+  if (b.x0 > margem && b.y0 > margem && b.x1 < WS_L - margem && b.y1 < WS_A - margem) return;
+  const dx = Math.round(WS_L / 2 - (b.x0 + b.x1) / 2), dy = Math.round(WS_A / 2 - (b.y0 + b.y1) / 2);
+  for (const c of cadeias) { c.x += dx; c.y += dy; }
+}
+// vista posicionada com o começo do programa no canto de cima/esquerda da tela
+function mostrarInicioDoPrograma() {
+  if (!cadeias.length) return;
+  const b = caixaBlocos();
+  vistaX = 20 - b.x0 * zoom; vistaY = 20 - b.y0 * zoom;
+  desenharVista?.();
+}
+
 function arrumar() {
   cadeias = cadeias.filter(c => c.blocos.length);
   if (simples) sincronizarFuncoes();
@@ -396,7 +414,7 @@ function limitarVista() {
 
 // ---------- zoom ----------
 let zoom = 1;
-const ZOOM_MIN = 0.4, ZOOM_MAX = 2;
+const ZOOM_MIN = 0.05, ZOOM_MAX = 2;   // zoom out praticamente livre
 
 // muda o zoom mantendo parado o ponto (px, py) da tela (relativo ao workspace)
 function zoomEm(novo, px, py) {
@@ -453,8 +471,9 @@ function definirModoSimples(ligar) {
   document.querySelector('#btnModo b').textContent = ligar ? 'Modo avançado' : 'Modo simplificado';
   if (ligar && !cadeias.some(c => c.blocos[0].tipo === 'play')) {
     // garante o Play: no canto de cima, acima de tudo que já existe
-    const y = cadeias.length ? Math.min(...cadeias.map(c => c.y)) - ALT_BLOCO - 12 : 20;
-    cadeias.unshift({ x: 20, y, blocos: [novoBloco('play')] });
+    const y = cadeias.length ? Math.min(...cadeias.map(c => c.y)) - ALT_BLOCO - 12 : INICIO_Y;
+    const x = cadeias.length ? Math.min(...cadeias.map(c => c.x)) : INICIO_X;
+    cadeias.unshift({ x, y, blocos: [novoBloco('play')] });
     ultimaCadeia = cadeias[0];
   }
   try { localStorage.setItem('modo', ligar ? 'simples' : 'avancado'); } catch {}
@@ -615,8 +634,9 @@ function tocar(a) {
   if (a.daPaleta) {                        // toque na paleta = adiciona no fim da última cadeia usada
     const b = novoDaPaleta(a);
     if (BLOCOS[a.tipo].chapeu || !ultimaCadeia) {
-      const y = Math.max(0, ...cadeias.map(c => c.y + ALT_BLOCO)) + 12;
-      cadeias.push(ultimaCadeia = { x: 20, y, blocos: [b] });
+      const y = cadeias.length ? Math.max(...cadeias.map(c => c.y + ALT_BLOCO)) + 12 : INICIO_Y;
+      const x = cadeias.length ? Math.min(...cadeias.map(c => c.x)) : INICIO_X;
+      cadeias.push(ultimaCadeia = { x, y, blocos: [b] });
     } else ultimaCadeia.blocos.push(b);
     desenhar();
     rolarAte(ultimaCadeia);
@@ -953,9 +973,9 @@ document.getElementById('btnModo').onclick = () => {
 document.getElementById('btnLimpar').onclick = () => {
   menu.classList.remove('aberto');
   if (!confirm('Apagar todos os blocos?')) return;
-  cadeias = [ { x: 20, y: 20, blocos: [ novoBloco('play') ] } ];
+  cadeias = [ { x: INICIO_X, y: INICIO_Y, blocos: [ novoBloco('play') ] } ];
   ultimaCadeia = cadeias[0];
-  vistaX = vistaY = 0; zoom = 1;
+  zoom = 1; mostrarInicioDoPrograma();
   paraSim({ tipo: 'reiniciar' });
   desenhar();
 };
@@ -1053,6 +1073,8 @@ try { const h = +localStorage.getItem('alturaSim'); if (h) sim.style.flexBasis =
 let modoSalvo = null;
 try { modoSalvo = localStorage.getItem('modo'); } catch {}
 carregarPrograma();
+centralizarPrograma();
+mostrarInicioDoPrograma();
 definirModoSimples(modoSalvo !== 'avancado');
 // ao abrir a página (ou trocar de página), se algum bloco ficou escondido, afasta (animado) até mostrar todos
 addEventListener('load', () => { if (algumBlocoOculto()) verTudo(); });
