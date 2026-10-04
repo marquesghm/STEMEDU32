@@ -979,9 +979,8 @@ let modoSalvo = null;
 try { modoSalvo = localStorage.getItem('modo'); } catch {}
 carregarPrograma();
 definirModoSimples(modoSalvo !== 'avancado');
-// ao abrir a página (ou trocar de página), se algum bloco ficou escondido, já abre afastado mostrando todos
-// (sem animação: a página já aparece assim, sem movimento que a criança não pediu)
-addEventListener('load', () => { if (algumBlocoOculto()) verTudo(false); });
+// ao abrir a página (ou trocar de página), se algum bloco ficou escondido, afasta (animado) até mostrar todos
+addEventListener('load', () => { if (algumBlocoOculto()) verTudo(); });
 </script>
 </body>
 </html>
