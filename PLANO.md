@@ -3,6 +3,20 @@
 Programação tangível na web para crianças (~7 anos). Blocos horizontais
 (estilo quebra-cabeça) → comandos Lua simples → microcontrolador (ESP32 / CH32V006).
 
+## Foco: experiência do usuário (UX)
+A UX é um dos focos principais do projeto. O público tem ~7 anos e usa principalmente
+celular/tablet com o dedo, então cada interação deve ser óbvia, tolerante a erro e
+gostosa de usar.
+
+- Alvos de toque grandes; gestos naturais (arrastar, pinça) e sem precisar de precisão.
+- Nada deve "brigar" com a criança: movimentos automáticos inesperados atrapalham.
+- Feedback visual imediato (bloco ativo aceso, marcador de encaixe, avisos curtos).
+- Pouco texto; ícones e cores dizem o que cada coisa faz.
+- O modo simplificado é o padrão; o avançado fica no menu.
+
+**Processo:** sugestões de UX são discutidas antes de implementar, e quando uma solução
+pedida tiver um ponto fraco de UX, isso é apontado (com alternativa) antes de seguir.
+
 ## Arquivos (fase 1)
 
 | Arquivo | Sistema | Responsabilidade |
