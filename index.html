@@ -33,7 +33,7 @@
   #ws{flex:1 1 auto;min-height:150px;overflow:hidden;position:relative;background:#fff;
     background-image:radial-gradient(#e6dcc0 1.5px,transparent 1.5px);background-size:24px 24px;
     border-top:4px solid #f0e2b8;touch-action:none;cursor:move}
-  #wsInterno{position:absolute;left:0;top:0;width:0;height:0;will-change:transform}
+  #wsInterno{position:absolute;left:0;top:0;width:0;height:0;will-change:transform;transform-origin:0 0}
   .cadeia{position:absolute;display:flex;align-items:flex-start}
 
   /* paleta */
@@ -49,7 +49,7 @@
     background:#fff;border:3px solid var(--rosa-esc);font:700 20px/26px system-ui;text-align:center}
   .bloco.ativo svg{filter:drop-shadow(0 0 6px #00b7ff) drop-shadow(0 0 6px #00b7ff)}
   .bloco.arrastando{opacity:.25}
-  .fantasma{position:fixed;z-index:10;pointer-events:none;opacity:.85;display:flex;align-items:flex-start}
+  .fantasma{position:fixed;transform-origin:0 0;z-index:10;pointer-events:none;opacity:.85;display:flex;align-items:flex-start}
   .marcador{position:absolute;width:6px;height:64px;border-radius:3px;background:#00b7ff;pointer-events:none}
 
   /* lua */
@@ -198,9 +198,28 @@ function limitesVista() {
   const minX = Math.min(...cadeias.map(c => c.x)), maxX = Math.max(...cadeias.map(c => c.x + larguraCadeia(c)));
   const minY = Math.min(...cadeias.map(c => c.y)), maxY = Math.max(...cadeias.map(c => c.y + ALT_BLOCO));
   // dá para empurrar os blocos para qualquer lado até sobrar só um pedaço visível
-  const x0 = VISIVEL - maxX, y0 = VISIVEL - maxY;
-  return { x0, x1: Math.max(x0, ws.clientWidth  - VISIVEL - minX),
-           y0, y1: Math.max(y0, ws.clientHeight - VISIVEL - minY) };
+  // (coordenadas do workspace × zoom = pixels na tela)
+  const x0 = VISIVEL - maxX * zoom, y0 = VISIVEL - maxY * zoom;
+  return { x0, x1: Math.max(x0, ws.clientWidth  - VISIVEL - minX * zoom),
+           y0, y1: Math.max(y0, ws.clientHeight - VISIVEL - minY * zoom) };
+}
+
+// ---------- zoom ----------
+let zoom = 1;
+const ZOOM_MIN = 0.4, ZOOM_MAX = 2;
+
+// muda o zoom mantendo parado o ponto (px, py) da tela (relativo ao workspace)
+function zoomEm(novo, px, py) {
+  novo = limitar(novo, ZOOM_MIN, ZOOM_MAX);
+  vistaX = px - (px - vistaX) * novo / zoom;
+  vistaY = py - (py - vistaY) * novo / zoom;
+  zoom = novo;
+}
+
+// posição de um ponto da tela relativa ao canto do workspace
+function pontoWs(x, y) {
+  const r = ws.getBoundingClientRect();
+  return { x: x - r.left - ws.clientLeft, y: y - r.top - ws.clientTop };
 }
 
 const limitar = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -213,8 +232,9 @@ function elastico(v, a, b) {
 }
 
 function desenharVista() {
-  wsInterno.style.transform = `translate(${vistaX}px, ${vistaY}px)`;
+  wsInterno.style.transform = `translate(${vistaX}px, ${vistaY}px) scale(${zoom})`;
   ws.style.backgroundPosition = `${vistaX}px ${vistaY}px`;   // pontinhos acompanham
+  ws.style.backgroundSize = `${24 * zoom}px ${24 * zoom}px`;
 }
 
 function aplicarVista() {
@@ -320,6 +340,9 @@ document.addEventListener('pointermove', e => {
     a.blocos = a.daPaleta ? [novoBloco(a.tipo)] : cadeias[a.ci].blocos.slice(a.bi);
     a.fantasma = document.createElement('div');
     a.fantasma.className = 'fantasma';
+    // bloco arrastado do workspace mantém o tamanho do zoom; da paleta, ganha o zoom do workspace
+    a.fantasma.style.transform = `scale(${zoom})`;
+    if (a.daPaleta) { a.dx *= zoom; a.dy *= zoom; }
     a.blocos.forEach(b => a.fantasma.appendChild(criarBlocoEl(b)));
     document.body.appendChild(a.fantasma);
     if (!a.daPaleta) [...a.el.parentNode.children].slice(a.bi).forEach(x => x.classList.add('arrastando'));
@@ -390,7 +413,7 @@ const sobrePaleta = e => e.clientY > paleta.getBoundingClientRect().top;
 // converte coordenada da tela -> coordenada dentro do workspace
 function paraWs(x, y) {
   const r = wsInterno.getBoundingClientRect();
-  return { x: Math.round(x - r.left), y: Math.round(y - r.top) };
+  return { x: Math.round((x - r.left) / zoom), y: Math.round((y - r.top) / zoom) };
 }
 
 // procura um encaixe perto de (fx,fy) — posição de tela do 1º bloco arrastado
@@ -423,33 +446,65 @@ function esconderMarcador() { marcador?.remove(); marcador = null; }
 
 function rolarAte(c) {
   // desloca a vista só o necessário para o último bloco da cadeia aparecer
-  const x = c.x + larguraCadeia(c) + vistaX, y = c.y + vistaY, w = ws.clientWidth, h = ws.clientHeight;
-  moverVista(x > w - 20 ? w - 20 - x : (c.x + vistaX < 0 ? -(c.x + vistaX) + 20 : 0),
-             y + ALT_BLOCO > h ? h - ALT_BLOCO - y : (y < 0 ? -y + 12 : 0));
+  const z = zoom, x0 = c.x * z + vistaX, x = (c.x + larguraCadeia(c)) * z + vistaX;
+  const y = c.y * z + vistaY, alt = ALT_BLOCO * z, w = ws.clientWidth, h = ws.clientHeight;
+  moverVista(x > w - 20 ? w - 20 - x : (x0 < 0 ? -x0 + 20 : 0),
+             y + alt > h ? h - alt - y : (y < 0 ? -y + 12 : 0));
 }
 
-// ---------- navegar arrastando o fundo (toque ou mouse) e com a roda do mouse ----------
-let pan = null;
+// ---------- navegar: 1 dedo arrasta, 2 dedos = pinça (zoom); mouse: arrastar e roda ----------
+const dedos = new Map();   // pointerId -> {x, y} dos dedos no fundo
+let pan = null;            // estado do gesto atual (arrastar ou pinça)
+
+function iniciarGesto() {
+  const [a, b] = [...dedos.values()];
+  if (b) {   // pinça: guarda distância inicial e o ponto do workspace entre os dedos
+    const m = pontoWs((a.x + b.x) / 2, (a.y + b.y) / 2);
+    pan = { pinca: true, d0: Math.hypot(a.x - b.x, a.y - b.y), z0: zoom,
+            mundoX: (m.x - vistaX) / zoom, mundoY: (m.y - vistaY) / zoom };
+  } else if (a) {
+    pan = { x0: a.x, y0: a.y, vx: vistaX, vy: vistaY };
+  } else pan = null;
+}
+
 ws.addEventListener('pointerdown', e => {
-  if (e.target.closest('.bloco')) return;
+  if (e.target.closest('.bloco') || dedos.size >= 2) return;
   cancelAnimationFrame(animVolta);
-  // brutoX/Y = onde a vista estaria sem limite; a tela mostra a versão "elástica"
-  pan = { id: e.pointerId, x0: e.clientX, y0: e.clientY, vx: vistaX, vy: vistaY };
-  ws.setPointerCapture(e.pointerId);
+  dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { ws.setPointerCapture(e.pointerId); } catch {}
+  iniciarGesto();
 });
 ws.addEventListener('pointermove', e => {
-  if (!pan || e.pointerId !== pan.id) return;
+  if (!dedos.has(e.pointerId)) return;
+  dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
   const l = limitesVista();
-  vistaX = elastico(pan.vx + e.clientX - pan.x0, l.x0, l.x1);
-  vistaY = elastico(pan.vy + e.clientY - pan.y0, l.y0, l.y1);
+  if (pan.pinca) {
+    const [a, b] = [...dedos.values()];
+    const m = pontoWs((a.x + b.x) / 2, (a.y + b.y) / 2);
+    zoom = limitar(pan.z0 * Math.hypot(a.x - b.x, a.y - b.y) / pan.d0, ZOOM_MIN, ZOOM_MAX);
+    // o ponto que estava entre os dedos continua entre os dedos (também arrasta com 2 dedos)
+    vistaX = m.x - pan.mundoX * zoom;
+    vistaY = m.y - pan.mundoY * zoom;
+  } else {
+    vistaX = elastico(pan.vx + e.clientX - pan.x0, l.x0, l.x1);
+    vistaY = elastico(pan.vy + e.clientY - pan.y0, l.y0, l.y1);
+  }
   desenharVista();
 });
-const fimPan = e => { if (pan && e.pointerId === pan.id) { pan = null; voltarElastico(); } };
+const fimPan = e => {
+  if (!dedos.delete(e.pointerId)) return;
+  iniciarGesto();                 // saiu 1 dos 2 dedos: continua arrastando com o outro
+  if (!pan) voltarElastico();
+};
 ws.addEventListener('pointerup', fimPan);
 ws.addEventListener('pointercancel', fimPan);
 ws.addEventListener('wheel', e => {
   e.preventDefault();
-  moverVista(-(e.shiftKey ? e.deltaY : e.deltaX), e.shiftKey ? 0 : -e.deltaY);
+  if (e.ctrlKey) {   // Ctrl + roda (e pinça do touchpad) = zoom
+    const p = pontoWs(e.clientX, e.clientY);
+    zoomEm(zoom * Math.exp(-e.deltaY * 0.01), p.x, p.y);
+    aplicarVista();
+  } else moverVista(-(e.shiftKey ? e.deltaY : e.deltaX), e.shiftKey ? 0 : -e.deltaY);
 }, { passive: false });
 
 // enquanto arrasta um bloco perto da borda, a vista anda sozinha
