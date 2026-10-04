@@ -39,7 +39,7 @@
   /* simulador */
   #sim{flex:0 1 38%;min-height:60px;position:relative}
   /* desfazer / refazer no canto inferior direito do simulador (refazer só aparece quando dá para refazer) */
-  .historico{position:absolute;right:8px;bottom:8px;display:flex;gap:6px}
+  .historico{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column-reverse;gap:6px}
   .historico button{width:48px;height:48px;border:0;border-radius:14px;background:#fffe;font:700 26px system-ui;
     color:#444;box-shadow:0 3px 0 rgba(0,0,0,.2);cursor:pointer;padding:0}
   .historico button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}

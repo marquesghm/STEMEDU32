@@ -23,8 +23,8 @@
   /* cenário 3D (simulador em modo edição) */
   #sim{flex:0 1 42%;min-height:120px;position:relative}
 
-  /* desfazer / refazer dos blocos (o histórico fica no editor; aqui só os botões) */
-  .historico{position:absolute;right:8px;bottom:8px;display:flex;gap:6px}
+  /* desfazer / refazer do construtor: histórico próprio, só dos terrenos (fica no simulador) */
+  .historico{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column-reverse;gap:6px}
   .historico button{width:48px;height:48px;border:0;border-radius:14px;background:#fffe;font:700 26px system-ui;
     color:#444;box-shadow:0 3px 0 rgba(0,0,0,.2);cursor:pointer;padding:0}
   .historico button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
@@ -88,7 +88,8 @@ const paraWs  = msg => wsFrame.contentWindow?.postMessage(msg, '*');
 
 addEventListener('message', ({ source, data }) => {
   if (!data?.tipo) return;
-  if (data.tipo === 'historico') {   // o editor avisa o que dá para desfazer/refazer
+  if (data.tipo === 'historico') return;   // histórico dos blocos (do editor) não é usado aqui
+  if (data.tipo === 'historicoCenario') {  // o simulador avisa o que dá para desfazer/refazer nos terrenos
     document.getElementById('cBtnDesfazer').disabled = !data.podeDesfazer;
     document.getElementById('cBtnRefazer').classList.toggle('visivel', data.podeRefazer);
     return;
@@ -108,8 +109,8 @@ document.getElementById('btnLimpar').onclick = () => {
 };
 
 document.getElementById('btnPlay').onclick = () => paraWs({ tipo: 'executarTodos' });
-document.getElementById('cBtnDesfazer').onclick = () => paraWs({ tipo: 'desfazer' });
-document.getElementById('cBtnRefazer').onclick = () => paraWs({ tipo: 'refazer' });
+document.getElementById('cBtnDesfazer').onclick = () => paraSim({ tipo: 'desfazerCenario' });
+document.getElementById('cBtnRefazer').onclick = () => paraSim({ tipo: 'refazerCenario' });
 document.getElementById('btnParar').onclick = () => paraWs({ tipo: 'pararTudo' });
 document.getElementById('btnVoltar').onclick = () => { location.href = 'index.html'; };
 </script>
