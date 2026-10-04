@@ -7,10 +7,16 @@
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#cfe9ff;touch-action:none}
   canvas{display:block}
-  #cameras{position:fixed;right:8px;top:8px;display:flex;gap:6px}
-  #cameras button{width:44px;height:44px;border:0;border-radius:12px;font-size:22px;background:#fffc;
-    box-shadow:0 2px 0 rgba(0,0,0,.2);cursor:pointer}
-  #cameras button:active{transform:translateY(2px)}
+  /* cubo gizmo: mostra para onde a câmera olha; tocar abre as visões */
+  #gizmo{position:fixed;left:6px;bottom:6px;width:64px;height:64px;cursor:pointer;
+    border-radius:50%;background:rgba(255,255,255,.35)}
+  #visoes{position:fixed;left:76px;bottom:8px;display:none;gap:6px;padding:6px;border-radius:14px;
+    background:#fffe;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  #visoes.aberto{display:flex}
+  #visoes button{display:flex;flex-direction:column;align-items:center;gap:2px;width:64px;height:56px;border:0;
+    border-radius:10px;background:#eef6ff;font:600 11px system-ui;color:#335;cursor:pointer;padding:4px}
+  #visoes button span{font-size:22px;line-height:24px}
+  #visoes button:active{transform:scale(.94)}
 </style>
 <script type="importmap">
 { "imports": {
@@ -20,9 +26,10 @@
 </script>
 </head>
 <body>
-<div id="cameras">
-  <button id="camPadrao" title="Visão normal">🎥</button>
-  <button id="camCima" title="Visão de cima">⬇️</button>
+<canvas id="gizmo" title="Escolher visão"></canvas>
+<div id="visoes">
+  <button id="camPadrao"><span>🎥</span>Normal</button>
+  <button id="camCima"><span>🗺️</span>De cima</button>
 </div>
 <script type="module">
 import * as THREE from 'three';
@@ -61,9 +68,49 @@ function irPara(nome) {
                 alvoDe: controles.target.clone(), t: 0, dur: 0.6 };
 }
 controles.addEventListener('start', () => { transicao = null; });   // mexeu com o dedo: cancela o voo
-document.getElementById('camPadrao').onclick = () => irPara('padrao');
-document.getElementById('camCima').onclick = () => irPara('cima');
 camera.position.copy(VISOES.padrao());
+
+// ---------- cubo gizmo (canto inferior esquerdo) ----------
+// Uma mini-cena com um cubo que gira igual à câmera principal. Tocar nele abre o menu de visões.
+const gizmoCanvas = document.getElementById('gizmo'), menuVisoes = document.getElementById('visoes');
+const gizmoRenderer = new THREE.WebGLRenderer({ canvas: gizmoCanvas, antialias: true, alpha: true });
+gizmoRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+gizmoRenderer.setSize(64, 64, false);
+const gizmoCena = new THREE.Scene();
+const gizmoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+
+function faceTextura(texto, cor) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = cor; g.fillRect(0, 0, 128, 128);
+  g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 8; g.strokeRect(4, 4, 120, 120);
+  g.fillStyle = '#fff'; g.font = 'bold 30px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(texto, 64, 66);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: t });
+}
+// ordem das faces do BoxGeometry: +X, -X, +Y, -Y, +Z, -Z  (frente do robô = +Z)
+const cuboGizmo = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), [
+  faceTextura('DIR', '#e5534b'), faceTextura('ESQ', '#e5534b'),
+  faceTextura('CIMA', '#2fa84f'), faceTextura('BAIXO', '#2fa84f'),
+  faceTextura('FRENTE', '#3d7fe0'), faceTextura('TRÁS', '#3d7fe0'),
+]);
+gizmoCena.add(cuboGizmo);
+
+function desenharGizmo() {
+  // a mini-câmera olha o cubo da mesma direção que a câmera principal olha a cena
+  const dir = camera.position.clone().sub(controles.target).normalize();
+  gizmoCam.position.copy(dir.multiplyScalar(3));
+  gizmoCam.up.copy(camera.up);
+  gizmoCam.lookAt(0, 0, 0);
+  gizmoRenderer.render(gizmoCena, gizmoCam);
+}
+
+gizmoCanvas.addEventListener('click', () => menuVisoes.classList.toggle('aberto'));
+for (const [id, visao] of [['camPadrao', 'padrao'], ['camCima', 'cima']])
+  document.getElementById(id).onclick = () => { irPara(visao); menuVisoes.classList.remove('aberto'); };
+// tocar na cena fecha o menu
+renderer.domElement.addEventListener('pointerdown', () => menuVisoes.classList.remove('aberto'));
 
 scene.add(new THREE.HemisphereLight('#ffffff', '#88aa66', 1.1));
 const sol = new THREE.DirectionalLight('#ffffff', 1.4);
@@ -180,6 +227,7 @@ function animar() {
   }
   controles.update();
   renderer.render(scene, camera);
+  desenharGizmo();
 }
 
 function redimensionar() {
