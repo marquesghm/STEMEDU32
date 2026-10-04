@@ -170,7 +170,6 @@ function lampada(acesa) {
   antena.material.emissive.set(acesa ? '#ffd400' : '#000000');
   antena.scale.setScalar(acesa ? 1.8 : 1);
   brilho.intensity = acesa ? 3 : 0;
-  if (acesa) iluminarPisos();
 }
 
 // piso preto na casa do robô: a luz troca preto <-> amarelo (fica assim até reiniciar).
@@ -183,11 +182,13 @@ function pintarPiso(k, aceso) {
   m.material.color.set(aceso ? COR_ACESO : TERRENOS.chao_preto.cor);
   m.material.emissive?.set(aceso ? '#6b5a00' : '#000000');
 }
+// troca a cor do piso embaixo do robô; devolve o terreno novo ('chao_amarelo'/'chao_preto') ou null
 function iluminarPisos() {
   const k = chaveCasa(Math.round(robo.position.x), Math.round(robo.position.z));
-  if (cenario[k] !== 'chao_preto') return;
+  if (cenario[k] !== 'chao_preto') return null;
   if (pisosAcesos.has(k)) pisosAcesos.delete(k); else pisosAcesos.add(k);
   pintarPiso(k, pisosAcesos.has(k));
+  return pisosAcesos.has(k) ? 'chao_amarelo' : 'chao_preto';
 }
 function apagarPisos() {
   for (const k of pisosAcesos) pintarPiso(k, false);
@@ -395,7 +396,8 @@ function proximo() {
     atual = { tipo: 'espera', t: 0, dur: 0.1 };
   } else if (cmd === 'luz') {          // n = segundos acesa
     lampada(true);
-    atual = { tipo: 'luz', t: 0, dur: Math.max(0.05, n) };
+    // se o piso embaixo trocou de cor, o sensor da cor nova dispara quando a luz apagar
+    atual = { tipo: 'luz', t: 0, dur: Math.max(0.05, n), trocou: iluminarPisos() };
   } else if (cmd === 'esquerda' || cmd === 'direita') {
     const ang = (cmd === 'esquerda' ? 1 : -1) * n * Math.PI / 2;
     atual = { tipo: 'girar', de: robo.rotation.y, para: robo.rotation.y + ang, t: 0,
@@ -471,7 +473,8 @@ function animar() {
         parent.postMessage({ tipo: 'caiu' }, '*');
         parent.postMessage({ tipo: 'fim' }, '*');
       }
-      else { if (a.tipo === 'luz') lampada(false); proximo(); }
+      else if (a.tipo === 'luz') { lampada(false); a.trocou ? tocou(a.trocou) : proximo(); }
+      else proximo();
     }
   }
   for (const m of grupoCenario.children) if (m.userData.gira) m.rotation.y += dt * 1.5;
