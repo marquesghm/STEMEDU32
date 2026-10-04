@@ -25,6 +25,7 @@
   .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
   .btn.verde{background:#3ec43e;color:#fff}
   .btn.vermelho{background:#ff4b4b;color:#fff}
+  .btn.azul{background:#3d8bff;color:#fff}
 
   /* menu hambúrguer */
   #menu{position:fixed;left:8px;top:62px;z-index:40;display:none;flex-direction:column;gap:4px;padding:6px;
@@ -149,6 +150,7 @@
   <button class="btn" id="btnMenu" title="Menu">☰</button>
   <h1>STEMEDU32</h1>
   <button class="btn verde" id="btnPlay" title="Executar">▶</button>
+  <button class="btn azul" id="btnPasso" title="Passo a passo">⏭&#xFE0E;</button>
   <button class="btn vermelho" id="btnParar" title="Parar">⏹</button>
 </header>
 <nav id="menu">
@@ -971,7 +973,8 @@ addEventListener('message', ({ data }) => {
   if (data.tipo === 'caiu') aviso('💦 O robô caiu na água!');
   if (data.tipo === 'cenarioMudou') montarPaleta();
   // comandos vindos do construtor de cenários (botões do header dele)
-  if (data.tipo === 'executarTodos') apertarPlay();   // ▶/⏭ do construtor
+  if (data.tipo === 'executarTodos') apertarPlay();   // ▶ do construtor
+  if (data.tipo === 'passoAPasso') apertarPasso();    // ⏭ do construtor
   if (data.tipo === 'desfazer') desfazer();
   if (data.tipo === 'refazer') refazer();
   if (data.tipo === 'pararTudo') document.getElementById('btnParar').click();
@@ -1001,24 +1004,24 @@ function executarTodos() {
   if (porta) enviarParaRobo();
 }
 
-// ---------- botão ▶ / ⏭ (passo a passo) ----------
-// parado: ▶ inicia e o botão vira ⏭. Rodando: ⏭ pausa no fim do bloco atual (modo passo).
-// Em modo passo: cada ⏭ executa o próximo bloco e pausa. No fim (ou ⏹) volta a ▶.
-let estadoPlay = 'parado';
-function definirEstadoPlay(e) {
-  estadoPlay = e;
-  const bt = document.getElementById('btnPlay');
-  bt.textContent = e === 'parado' ? '▶' : '⏭\uFE0E';
-  bt.title = e === 'parado' ? 'Executar' : 'Passo a passo';
-  if (MODO_CENARIO) parent.postMessage({ tipo: 'estadoPlay', estado: e }, '*');
-}
+// ---------- ▶ play e ⏭ passo a passo (botões separados) ----------
+// ▶ parado: roda até o fim. ▶ em modo passo: continua rodando até o fim.
+// ⏭ parado: começa em modo passo (executa o 1º bloco e pausa).
+// ⏭ rodando: pausa no fim do bloco atual. ⏭ em modo passo: executa o próximo bloco e pausa.
+let estadoPlay = 'parado';   // 'parado' | 'rodando' | 'passo'
+function definirEstadoPlay(e) { estadoPlay = e; }
 function apertarPlay() {
   if (estadoPlay === 'parado') executarTodos();
+  else if (estadoPlay === 'passo') { paraSim({ tipo: 'continuar' }); definirEstadoPlay('rodando'); }
+}
+function apertarPasso() {
+  if (estadoPlay === 'parado') { executarTodos(); if (estadoPlay === 'rodando') { paraSim({ tipo: 'modoPasso', primeiro: true }); definirEstadoPlay('passo'); } }
   else if (estadoPlay === 'rodando') { paraSim({ tipo: 'modoPasso' }); definirEstadoPlay('passo'); }
   else paraSim({ tipo: 'avancar' });
 }
 
 document.getElementById('btnPlay').onclick = apertarPlay;
+document.getElementById('btnPasso').onclick = apertarPasso;
 document.getElementById('btnDesfazer').onclick = desfazer;
 document.getElementById('btnRefazer').onclick = refazer;
 document.getElementById('btnParar').onclick = () => {

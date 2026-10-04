@@ -422,7 +422,7 @@ let pendentes = [];      // terrenos tocados durante o comando atual
 let ofsReacao = 0;       // comandos de reação já inseridos depois do comando atual
 
 function proximo() {
-  if (modoPasso && !pendentes.length) {
+  if (modoPasso && !pendentes.length && fila[indice + 1]?.cmd !== 'pular') {
     if (liberados <= 0) { pausado = true; atual = { tipo: 'aguardando' }; return; }
     liberados--;
   }
@@ -558,7 +558,11 @@ addEventListener('message', ({ data }) => {
     if (!tocarCasaAtual()) proximo();   // terreno embaixo do robô na saída também conta
   }
   else if (data.tipo === 'parar') { fila = []; atual = null; }
-  else if (data.tipo === 'modoPasso') { modoPasso = true; liberados = 0; }
+  else if (data.tipo === 'modoPasso') { modoPasso = true; liberados = data.primeiro ? 1 : 0; }
+  else if (data.tipo === 'continuar') {   // sai do modo passo e roda até o fim
+    modoPasso = false; liberados = 0;
+    if (pausado) { pausado = false; proximo(); }
+  }
   else if (data.tipo === 'avancar') {
     if (pausado) { pausado = false; liberados = 1; proximo(); }
     else liberados = 1;   // ainda terminando o bloco atual: o próximo já está liberado

@@ -54,7 +54,7 @@ De cima para baixo, na página principal (`index.html`):
 
 | Área | O que é |
 |---|---|
-| **Header** | ☰ menu · título · **▶ / ⏭** (verde) · **⏹** (vermelho) |
+| **Header** | ☰ menu · título · **▶** (verde) · **⏭** passo (azul) · **⏹** (vermelho) |
 | **Simulador** | robô 3D no chão quadriculado; cubo gizmo no canto inferior esquerdo; ↶/↷ no inferior direito |
 | **Divisor** | linha fina arrastável que aumenta/diminui simulador × workspace |
 | **Workspace** | folha onde se montam os programas |
@@ -105,10 +105,11 @@ Interações com blocos (padrão: **tocar abre uma janelinha com opções**):
 
 - **▶** executa as sequências que começam com Play (de cima para baixo).
   Tocar no bloco Play do workspace executa só aquela sequência.
-- Enquanto roda, o botão vira **⏭ (passo)**:
-  - sem tocar de novo → roda até o fim e volta a ▶;
-  - tocar em ⏭ → pausa no fim do bloco atual; cada toque seguinte executa **um bloco**
-    e pausa, até o fim.
+- **⏭ passo a passo** (botão azul, entre ▶ e ⏹):
+  - com o programa parado → começa e executa só o **primeiro bloco**, depois pausa;
+  - durante a execução → pausa no fim do bloco atual;
+  - pausado → executa **um bloco** e pausa de novo, até o fim.
+- **▶ com o programa pausado** continua rodando até o fim.
 - **⏹** para tudo e coloca o robô de volta na saída.
 - O bloco em execução **acende em azul**.
 
@@ -129,7 +130,7 @@ Interações com blocos (padrão: **tocar abre uma janelinha com opções**):
 
 Menu ☰ → **Construir cenário** abre `cenario.html`:
 
-- **Header:** ← volta a programar · ▶/⏭ testar · ⏹ parar.
+- **Header:** ← volta a programar · ▶ testar · ⏭ passo a passo · ⏹ parar.
 - **Cenário 3D** (abre visto de cima) com **↶/↷ próprios** (só dos terrenos).
 - **Paleta de terrenos:** escolha a ferramenta e toque/arraste no chão para pintar.
   Com ✋ **Mover**, um dedo gira a câmera; com uma ferramenta, a câmera usa 2 dedos.
@@ -259,7 +260,7 @@ Principais mensagens:
 
 | De → para | Mensagem | Uso |
 |---|---|---|
-| editor → simulador | `executar {comandos}` · `reiniciar` · `modoPasso` · `avancar` | rodar / parar / passo a passo |
+| editor → simulador | `executar {comandos}` · `reiniciar` · `modoPasso` · `avancar` · `continuar` | rodar / parar / passo a passo |
 | simulador → editor | `passo {indice}` · `fim` | destacar bloco em execução |
 | simulador → editor | `tocou {terreno, indice}` | sensor disparou (o simulador espera a resposta) |
 | editor → simulador | `reagir {comandos}` | comandos da reação (podem ser vazios) |
