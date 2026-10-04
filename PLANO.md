@@ -115,4 +115,4 @@ o mesmo texto serve aos dois.
 1. Firmware ESP32 (Lua real) e CH32V006 (parser mínimo) + motores.
 2. Web Bluetooth (BLE) para ESP32 — celular sem cabo.
 3. Blocos: espera, repetir, som, LED, sensores.
-4. Salvar/abrir programas (localStorage), PWA offline.
+4. Biblioteca com vários projetos no navegador e suporte offline como PWA.

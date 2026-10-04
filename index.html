@@ -26,6 +26,7 @@
   .btn.verde{background:#3ec43e;color:#fff}
   .btn.vermelho{background:#ff4b4b;color:#fff}
   .btn.azul{background:#3d8bff;color:#fff}
+  .btn.selecionado{outline:4px solid #183e70;outline-offset:1px;filter:brightness(.88)}
 
   /* menu hambúrguer */
   #menu{position:fixed;left:8px;top:62px;z-index:40;display:none;flex-direction:column;gap:4px;padding:6px;
@@ -109,6 +110,21 @@
   #menuTerreno button svg{width:100%;height:100%;display:block}
   #menuTerreno button.atual{border-color:#ff9d1a;background:#fff3e0}
   #menuTerreno button:active{transform:scale(.92)}
+  #menuFuncao{position:fixed;z-index:26;display:none;grid-template-columns:repeat(2,76px);gap:6px;padding:8px;
+    background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);border:3px solid #777}
+  #menuFuncao.aberto{display:grid}
+  #menuFuncao button{width:76px;height:56px;border:3px solid transparent;border-radius:14px;color:#fff;
+    font:700 15px system-ui;cursor:pointer}
+  #menuFuncao button.atual{outline:3px solid #333;outline-offset:1px}
+  .modal-projeto{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:#0006}
+  .modal-projeto.aberto{display:flex}
+  .caixa-projeto{width:min(340px,calc(100% - 32px));padding:16px;border-radius:18px;background:#fff;box-shadow:0 8px 30px #0005}
+  .caixa-projeto h2{margin:0 0 12px;font-size:20px}
+  .caixa-projeto label{display:block;margin-bottom:6px;font-weight:600}
+  .caixa-projeto input{width:100%;height:48px;padding:8px 12px;border:2px solid #ddd;border-radius:10px;font:18px system-ui;user-select:text;-webkit-user-select:text}
+  .caixa-projeto div{display:flex;gap:8px;margin-top:14px}
+  .caixa-projeto button{flex:1;min-height:46px;border:0;border-radius:12px;background:#eee;font:600 16px system-ui}
+  .caixa-projeto #confirmarNomeProjeto{background:#3ec43e;color:white}
   .bloco .num.tempo{font-size:16px;border-color:#0b7f76}
   #menuNumero.tempo{grid-template-columns:repeat(3,64px);border-color:#0b7f76}
   #menuNumero.tempo button{width:64px;border-radius:22px;font-size:18px;border-color:#b6e8e3}
@@ -159,6 +175,8 @@
   <button id="btnModo"><span>🧸</span><b>Modo simplificado</b></button>
   <button id="btnCenario"><span>🏗️</span><b>Construir cenário</b></button>
   <button id="btnConfig"><span>⚙️</span><b>Configurações</b></button>
+  <button id="btnSalvarProjeto"><span>💾</span><b>Salvar projeto</b></button>
+  <button id="btnAbrirProjeto"><span>📂</span><b>Abrir projeto</b></button>
   <button id="btnLimpar"><span>🗑️</span><b>Limpar tudo</b></button>
 </nav>
 
@@ -175,6 +193,11 @@
 
 <div id="menuNumero"></div>
 <div id="menuTerreno"></div>
+<div id="menuFuncao" role="dialog" aria-label="Escolher cor da função"></div>
+<input id="arquivoProjeto" type="file" accept=".json,application/json" hidden>
+<div id="nomeProjeto" class="modal-projeto"><div class="caixa-projeto"><h2>Salvar projeto</h2><label for="nomeProjetoTexto">Nome</label>
+  <input id="nomeProjetoTexto" maxlength="60" value="Meu projeto">
+  <div><button id="cancelarNomeProjeto">Cancelar</button><button id="confirmarNomeProjeto">Salvar arquivo</button></div></div></div>
 <div id="config">
   <div class="caixa">
     <h2>⚙️ Configurações</h2>
@@ -679,10 +702,7 @@ function tocar(a) {
   ultimaCadeia = c;
   if (b.tipo === 'play') executar(c);
   else if (b.tipo === 'sensor') { if (!simples && a.alvoNum) abrirMenuTerreno(b, a.alvoNum); }   // bolinha = menu de terreno
-  else if (b.tipo === 'chamar' || (b.tipo === 'funcao' && !simples)) {   // toque = troca a cor
-    b.cor = LISTA_CORES[(LISTA_CORES.indexOf(b.cor) + 1) % LISTA_CORES.length];
-    desenhar();
-  }
+  else if (b.tipo === 'chamar' || (b.tipo === 'funcao' && !simples)) abrirMenuFuncao(b, a.el);
   else if (a.alvoNum) abrirMenuNumero(b, a.alvoNum);      // toque no número = menu 0..9
 }
 
@@ -758,6 +778,41 @@ document.addEventListener('pointerdown', e => {
   if (blocoTerreno && !menuTerreno.contains(e.target)) fecharMenuTerreno();
 }, true);
 menuTerreno.addEventListener('pointerdown', e => e.stopPropagation());
+
+// Início e chamada de função compartilham a mesma escolha explícita de cor.
+const menuFuncao = document.getElementById('menuFuncao');
+const NOMES_CORES = { vermelho:'Vermelha', azul:'Azul', verde:'Verde', roxo:'Roxa' };
+for (const cor of LISTA_CORES) {
+  const bt = document.createElement('button');
+  bt.type = 'button'; bt.dataset.cor = cor; bt.textContent = NOMES_CORES[cor];
+  bt.style.background = CORES_FUNCAO[cor][0];
+  menuFuncao.appendChild(bt);
+}
+let blocoFuncao = null;
+function abrirMenuFuncao(b, alvo) {
+  blocoFuncao = b;
+  menuFuncao.querySelectorAll('button').forEach(bt => {
+    const atual = bt.dataset.cor === b.cor;
+    bt.classList.toggle('atual', atual); bt.setAttribute('aria-pressed', String(atual));
+  });
+  menuFuncao.classList.add('aberto');
+  const r = alvo.getBoundingClientRect(), m = menuFuncao.getBoundingClientRect();
+  let y = r.bottom + 6;
+  if (y + m.height > innerHeight - 8) y = r.top - m.height - 6;
+  menuFuncao.style.left = limitar(r.left + r.width / 2 - m.width / 2, 8, innerWidth - m.width - 8) + 'px';
+  menuFuncao.style.top = Math.max(8, y) + 'px';
+}
+function fecharMenuFuncao() { menuFuncao.classList.remove('aberto'); blocoFuncao = null; }
+menuFuncao.addEventListener('click', e => {
+  const bt = e.target.closest('button');
+  if (!bt || !blocoFuncao) return;
+  blocoFuncao.cor = bt.dataset.cor;
+  fecharMenuFuncao(); desenhar();
+});
+document.addEventListener('pointerdown', e => {
+  if (blocoFuncao && !menuFuncao.contains(e.target)) fecharMenuFuncao();
+}, true);
+menuFuncao.addEventListener('pointerdown', e => e.stopPropagation());
 
 const sobrePaleta = e => e.clientY > paleta.getBoundingClientRect().top;
 
@@ -1009,7 +1064,17 @@ function executarTodos() {
 // ⏭ parado: começa em modo passo (executa o 1º bloco e pausa).
 // ⏭ rodando: pausa no fim do bloco atual. ⏭ em modo passo: executa o próximo bloco e pausa.
 let estadoPlay = 'parado';   // 'parado' | 'rodando' | 'passo'
-function definirEstadoPlay(e) { estadoPlay = e; }
+function definirEstadoPlay(e) {
+  estadoPlay = e;
+  const play = document.getElementById('btnPlay'), passo = document.getElementById('btnPasso');
+  play.classList.toggle('selecionado', e === 'rodando');
+  passo.classList.toggle('selecionado', e === 'passo');
+  play.setAttribute('aria-pressed', String(e === 'rodando'));
+  passo.setAttribute('aria-pressed', String(e === 'passo'));
+  play.title = e === 'passo' ? 'Continuar execução' : e === 'rodando' ? 'Executando' : 'Executar';
+  passo.title = e === 'passo' ? 'Avançar um passo' : e === 'rodando' ? 'Pausar ao fim do passo' : 'Passo a passo';
+  if (MODO_CENARIO) parent.postMessage({ tipo: 'estadoExecucao', estado: e }, '*');
+}
 function apertarPlay() {
   if (estadoPlay === 'parado') executarTodos();
   else if (estadoPlay === 'passo') { paraSim({ tipo: 'continuar' }); definirEstadoPlay('rodando'); }
@@ -1074,6 +1139,86 @@ document.getElementById('btnConfig').onclick = () => {
 };
 janelaConfig.querySelector('.fechar').onclick = () => janelaConfig.classList.remove('aberto');
 janelaConfig.addEventListener('click', e => { if (e.target === janelaConfig) janelaConfig.classList.remove('aberto'); });
+
+// Exporta/importa um projeto pequeno com os dois workspaces, o cenário e as preferências.
+const nomeProjeto = document.getElementById('nomeProjeto');
+const campoNomeProjeto = document.getElementById('nomeProjetoTexto');
+const arquivoProjeto = document.getElementById('arquivoProjeto');
+const programaVazio = () => ({ cadeias:[], proxId:1 });
+function lerJSONSalvo(chave, padrao) {
+  try { const valor = localStorage.getItem(chave); return valor ? JSON.parse(valor) : padrao; } catch { return padrao; }
+}
+function baixarProjeto(nome) {
+  salvarPrograma();
+  let alturaSalva = null;
+  try { alturaSalva = +localStorage.getItem('alturaSim') || null; } catch {}
+  const dados = {
+    formato:'STEMEDU32', versao:1, nome,
+    programas:{ programa:lerJSONSalvo('programa', programaVazio()), programaCenario:lerJSONSalvo('programaCenario', programaVazio()) },
+    cenario:lerJSONSalvo('cenario', {}), inicioRobo:lerJSONSalvo('inicioRobo', { x:0,z:0,rot:0 }),
+    modo:simples ? 'simples' : 'avancado', config, alturaSim:alturaSalva,
+  };
+  const blob = new Blob([JSON.stringify(dados, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  const nomeArquivo = (nome.trim() || 'projeto').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0,60);
+  a.href = url; a.download = `${nomeArquivo}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  nomeProjeto.classList.remove('aberto'); aviso('Projeto salvo!');
+}
+function validarPrograma(p) {
+  if (!p || !Array.isArray(p.cadeias) || p.cadeias.length > 300 || !Number.isInteger(p.proxId) || p.proxId < 1) return false;
+  let total = 0;
+  for (const c of p.cadeias) {
+    if (!c || !Number.isFinite(c.x) || !Number.isFinite(c.y) || c.x < 0 || c.x > WS_L || c.y < 0 || c.y > WS_A || !Array.isArray(c.blocos) || !c.blocos.length) return false;
+    total += c.blocos.length; if (total > 1200) return false;
+    for (const b of c.blocos) {
+      if (!b || !Number.isInteger(b.id) || b.id < 1 || !Object.hasOwn(BLOCOS, b.tipo)) return false;
+      if (b.n !== undefined && (!Number.isFinite(b.n) || b.n < 0 || b.n > 9)) return false;
+      if ((b.tipo === 'funcao' || b.tipo === 'chamar') && !LISTA_CORES.includes(b.cor)) return false;
+      if (b.tipo === 'sensor' && !TERRENOS.includes(b.terreno)) return false;
+    }
+  }
+  return true;
+}
+function validarProjeto(p) {
+  if (!p || p.formato !== 'STEMEDU32' || p.versao !== 1 || !p.programas || !validarPrograma(p.programas.programa) || !validarPrograma(p.programas.programaCenario)) return false;
+  if (!p.cenario || typeof p.cenario !== 'object' || Array.isArray(p.cenario) || Object.keys(p.cenario).length > 121) return false;
+  for (const [k,v] of Object.entries(p.cenario)) {
+    const m = /^(-?\d+),(-?\d+)$/.exec(k);
+    if (!m || Math.abs(+m[1]) > 5 || Math.abs(+m[2]) > 5 || !['parede','estrela','agua','chao_vermelho','chao_azul','chao_verde','chao_preto'].includes(v)) return false;
+  }
+  const i = p.inicioRobo;
+  if (!i || !Number.isInteger(i.x) || !Number.isInteger(i.z) || Math.abs(i.x) > 5 || Math.abs(i.z) > 5 || !Number.isInteger(i.rot) || i.rot < 0 || i.rot > 3) return false;
+  if (!['simples','avancado'].includes(p.modo) || !p.config || !OPCOES_CONFIG.luz.includes(p.config.luz) || !OPCOES_CONFIG.passo.includes(p.config.passo)) return false;
+  return p.alturaSim === null || (Number.isFinite(p.alturaSim) && p.alturaSim > 0 && p.alturaSim < 2000);
+}
+document.getElementById('btnSalvarProjeto').onclick = () => {
+  menu.classList.remove('aberto'); campoNomeProjeto.value = 'Meu projeto';
+  nomeProjeto.classList.add('aberto'); campoNomeProjeto.focus(); campoNomeProjeto.select();
+};
+document.getElementById('cancelarNomeProjeto').onclick = () => nomeProjeto.classList.remove('aberto');
+document.getElementById('confirmarNomeProjeto').onclick = () => baixarProjeto(campoNomeProjeto.value.trim() || 'Meu projeto');
+campoNomeProjeto.addEventListener('keydown', e => { if (e.key === 'Enter') baixarProjeto(campoNomeProjeto.value.trim() || 'Meu projeto'); });
+document.getElementById('btnAbrirProjeto').onclick = () => { menu.classList.remove('aberto'); arquivoProjeto.click(); };
+arquivoProjeto.addEventListener('change', async () => {
+  const arquivo = arquivoProjeto.files?.[0]; arquivoProjeto.value = '';
+  if (!arquivo) return;
+  try {
+    if (arquivo.size > 1_000_000) throw new Error('O arquivo é grande demais.');
+    const projeto = JSON.parse(await arquivo.text());
+    if (!validarProjeto(projeto)) throw new Error('Esse arquivo não parece ser um projeto STEMEDU32 válido.');
+    const nome = String(projeto.nome || 'projeto').slice(0,60);
+    if (!confirm(`Abrir "${nome}"? Isso substituirá os projetos e o cenário salvos neste navegador.`)) return;
+    localStorage.setItem('programa', JSON.stringify(projeto.programas.programa));
+    localStorage.setItem('programaCenario', JSON.stringify(projeto.programas.programaCenario));
+    localStorage.setItem('cenario', JSON.stringify(projeto.cenario));
+    localStorage.setItem('inicioRobo', JSON.stringify(projeto.inicioRobo));
+    localStorage.setItem('modo', projeto.modo);
+    localStorage.setItem('config', JSON.stringify({ luz:projeto.config.luz, passo:projeto.config.passo }));
+    if (projeto.alturaSim === null) localStorage.removeItem('alturaSim'); else localStorage.setItem('alturaSim', String(projeto.alturaSim));
+    location.reload();
+  } catch (err) { aviso(err.message || 'Não foi possível abrir o projeto.'); }
+});
 
 document.getElementById('btnLimpar').onclick = () => {
   menu.classList.remove('aberto');

@@ -78,8 +78,8 @@ Interações com blocos (padrão: **tocar abre uma janelinha com opções**):
 
 - **Bolinha embaixo do bloco** (modo avançado): número de vezes (0–9), tempo da lâmpada
   (0,5–5 s) ou terreno do sensor.
-- **Chamar função**: tocar troca a cor (o início de função da mesma cor aparece sozinho
-  no modo simplificado).
+- **Chamar função** (e início de função no modo avançado): tocar abre uma janela para
+  escolher a cor. No modo simplificado, o início correspondente aparece sozinho.
 
 ---
 
@@ -98,6 +98,8 @@ Interações com blocos (padrão: **tocar abre uma janelinha com opções**):
   mostrar todos.
 - **↶ / ↷** (canto inferior direito do simulador) desfazem/refazem mudanças nos blocos.
   O ↷ só aparece (acima do ↶) quando há algo para refazer.
+- No construtor de cenários, os mesmos botões desfazem/refazem a última mudança feita
+  nos blocos ou nos terrenos.
 
 ---
 
@@ -112,6 +114,8 @@ Interações com blocos (padrão: **tocar abre uma janelinha com opções**):
 - **▶ com o programa pausado** continua rodando até o fim.
 - **⏹** para tudo e coloca o robô de volta na saída.
 - O bloco em execução **acende em azul**.
+- O botão ativo ganha um contorno; no passo a passo, ▶ indica que pode continuar e ⏭
+  indica que o próximo passo será executado.
 
 ---
 
@@ -185,7 +189,13 @@ Os sensores aparecem na paleta no construtor, ou na página principal quando há
 | 🧸 Modo simplificado / avançado | alterna os modos |
 | 🏗️ Construir cenário | abre o construtor |
 | ⚙️ Configurações | tempo da lâmpada (simplificado): 0,25/0,5/1/2 s · tempo de cada passo do robô: 0,3/0,6/1/1,5 s |
+| 💾 Salvar projeto | baixa um arquivo JSON com nome escolhido |
+| 📂 Abrir projeto | carrega um arquivo JSON de projeto STEMEDU32 |
 | 🗑️ Limpar tudo | apaga os blocos (com confirmação) |
+
+O arquivo de projeto reúne os dois programas, o cenário, a posição e orientação do robô,
+o modo simplificado/avançado e as configurações. Abrir um projeto substitui esses dados
+salvos no navegador e recarrega a página.
 
 ---
 
@@ -283,6 +293,9 @@ Tudo no `localStorage` do navegador:
 | `config` | tempo da lâmpada e de cada passo |
 | `alturaSim` | posição do divisor simulador × workspace |
 
+Salvar projeto também cria um arquivo JSON portátil com os dados dessas chaves; abrir um
+arquivo STEMEDU32 restaura o conjunto completo.
+
 ---
 
 ## Princípios de UX
@@ -300,5 +313,5 @@ Tudo no `localStorage` do navegador:
 - Firmware ESP32 (Lua) e CH32V006 (interpretador mínimo) com motores e LED.
 - Web Bluetooth (BLE) para o ESP32 funcionar no celular sem cabo.
 - Blocos de espera, repetir e som.
-- Janelinha de cores para os blocos de função (seguindo o padrão de UX).
+- Refinar o gerenciamento de projetos (por exemplo, vários projetos na biblioteca do navegador).
 - Publicar em `https` (ex.: GitHub Pages) para testar no celular com Web Serial/BLE.

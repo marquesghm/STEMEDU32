@@ -44,6 +44,9 @@ No `localStorage`:
 | `config` | `{luz, passo}` tempo da lâmpada (simplificado) e de cada passo |
 | `alturaSim` | posição do divisor |
 
+O menu principal exporta/importa arquivos JSON de projeto com os dois programas, cenário,
+posição do robô e preferências. Ao alterar esse formato, atualizar também o README.
+
 ## Regras do motor (para não quebrar comportamentos combinados)
 
 - Robô anda **uma casa por vez**; começa de costas para a câmera (`ROT_INICIAL`).

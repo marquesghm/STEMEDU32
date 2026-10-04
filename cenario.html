@@ -20,6 +20,7 @@
   .btn.verde{background:#3ec43e;color:#fff}
   .btn.vermelho{background:#ff4b4b;color:#fff}
   .btn.azul{background:#3d8bff;color:#fff}
+  .btn.selecionado{outline:4px solid #183e70;outline-offset:1px;filter:brightness(.88)}
 
   /* cenário 3D (simulador em modo edição) */
   #sim{flex:0 1 42%;min-height:120px;position:relative}
@@ -105,15 +106,49 @@ const simFrame = document.getElementById('simFrame'), wsFrame = document.getElem
 const paraSim = msg => simFrame.contentWindow?.postMessage(msg, '*');
 const paraWs  = msg => wsFrame.contentWindow?.postMessage(msg, '*');
 
+let historicoBlocos = { podeDesfazer:false, podeRefazer:false };
+let historicoCenario = { podeDesfazer:false, podeRefazer:false };
+let ultimoHistorico = 'cenario';
+function atualizarBotoesHistorico() {
+  const podeDesfazer = historicoBlocos.podeDesfazer || historicoCenario.podeDesfazer;
+  const podeRefazer = historicoBlocos.podeRefazer || historicoCenario.podeRefazer;
+  document.getElementById('cBtnDesfazer').disabled = !podeDesfazer;
+  const refazer = document.getElementById('cBtnRefazer');
+  refazer.disabled = !podeRefazer;
+  refazer.classList.toggle('visivel', podeRefazer);
+}
+function fonteHistorico(passo) {
+  const primeiro = ultimoHistorico === 'blocos' ? historicoBlocos : historicoCenario;
+  const outro = ultimoHistorico === 'blocos' ? historicoCenario : historicoBlocos;
+  const chave = passo === -1 ? 'podeDesfazer' : 'podeRefazer';
+  return primeiro[chave] ? ultimoHistorico : outro[chave] ? (ultimoHistorico === 'blocos' ? 'cenario' : 'blocos') : null;
+}
+function atualizarEstadoExecucao(estado) {
+  const play = document.getElementById('btnPlay'), passo = document.getElementById('btnPasso');
+  play.classList.toggle('selecionado', estado === 'rodando');
+  passo.classList.toggle('selecionado', estado === 'passo');
+  play.setAttribute('aria-pressed', String(estado === 'rodando'));
+  passo.setAttribute('aria-pressed', String(estado === 'passo'));
+  play.title = estado === 'passo' ? 'Continuar execução' : estado === 'rodando' ? 'Executando' : 'Testar';
+  passo.title = estado === 'passo' ? 'Avançar um passo' : estado === 'rodando' ? 'Pausar ao fim do passo' : 'Passo a passo';
+}
+
 addEventListener('message', ({ source, data }) => {
   if (!data?.tipo) return;
   if (data.tipo === 'toqueSim') { menuRobo.classList.remove('aberto'); return; }
   if (data.tipo === 'menuRobo') { abrirMenuRobo(data); return; }
-  if (data.tipo === 'historico') return;
-   // histórico dos blocos (do editor) não é usado aqui
-  if (data.tipo === 'historicoCenario') {  // o simulador avisa o que dá para desfazer/refazer nos terrenos
-    document.getElementById('cBtnDesfazer').disabled = !data.podeDesfazer;
-    document.getElementById('cBtnRefazer').classList.toggle('visivel', data.podeRefazer);
+  if (data.tipo === 'historico' && source === wsFrame.contentWindow) {
+    historicoBlocos = { podeDesfazer:data.podeDesfazer, podeRefazer:data.podeRefazer };
+    ultimoHistorico = 'blocos'; atualizarBotoesHistorico(); return;
+  }
+  if (data.tipo === 'historicoCenario' && source === simFrame.contentWindow) {
+    historicoCenario = { podeDesfazer:data.podeDesfazer, podeRefazer:data.podeRefazer };
+    ultimoHistorico = 'cenario'; atualizarBotoesHistorico(); return;
+  }
+  if (data.tipo === 'estadoExecucao' && source === wsFrame.contentWindow) {
+    atualizarEstadoExecucao(data.estado); return;
+  }
+  if (data.tipo === 'historico' || data.tipo === 'historicoCenario') {
     return;
   }
   if (source === simFrame.contentWindow) paraWs(data);       // passo, fim, tocou, vitoria, cenarioMudou...
@@ -149,8 +184,16 @@ document.addEventListener('pointerdown', e => { if (!menuRobo.contains(e.target)
 
 document.getElementById('btnPlay').onclick = () => paraWs({ tipo: 'executarTodos' });
 document.getElementById('btnPasso').onclick = () => paraWs({ tipo: 'passoAPasso' });
-document.getElementById('cBtnDesfazer').onclick = () => paraSim({ tipo: 'desfazerCenario' });
-document.getElementById('cBtnRefazer').onclick = () => paraSim({ tipo: 'refazerCenario' });
+document.getElementById('cBtnDesfazer').onclick = () => {
+  const alvo = fonteHistorico(-1); if (!alvo) return;
+  ultimoHistorico = alvo;
+  (alvo === 'blocos' ? paraWs : paraSim)({ tipo: alvo === 'blocos' ? 'desfazer' : 'desfazerCenario' });
+};
+document.getElementById('cBtnRefazer').onclick = () => {
+  const alvo = fonteHistorico(+1); if (!alvo) return;
+  ultimoHistorico = alvo;
+  (alvo === 'blocos' ? paraWs : paraSim)({ tipo: alvo === 'blocos' ? 'refazer' : 'refazerCenario' });
+};
 document.getElementById('btnParar').onclick = () => paraWs({ tipo: 'pararTudo' });
 document.getElementById('btnVoltar').onclick = () => { location.href = 'index.html'; };
 </script>
