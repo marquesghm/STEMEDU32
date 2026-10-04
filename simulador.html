@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simulador</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#cfe9ff;touch-action:none}
+  canvas{display:block}
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+
+const PASSO = 1;          // 1 unidade de grade por "frente(1)"
+const VEL_MOVE = 1.6;     // unidades / s
+const VEL_GIRO = Math.PI; // rad / s
+
+// ---------- cena ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe9ff');
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(5, 7, 7);
+camera.lookAt(0, 0, 0);
+
+scene.add(new THREE.HemisphereLight('#ffffff', '#88aa66', 1.1));
+const sol = new THREE.DirectionalLight('#ffffff', 1.4);
+sol.position.set(4, 10, 3);
+sol.castShadow = true;
+sol.shadow.camera.left = sol.shadow.camera.bottom = -8;
+sol.shadow.camera.right = sol.shadow.camera.top = 8;
+scene.add(sol);
+
+// chão quadriculado
+const TAM = 10;
+const chao = new THREE.Mesh(new THREE.PlaneGeometry(TAM, TAM),
+  new THREE.MeshLambertMaterial({ color: '#9fd67a' }));
+chao.rotation.x = -Math.PI / 2;
+chao.receiveShadow = true;
+scene.add(chao);
+const grade = new THREE.GridHelper(TAM, TAM, '#6aa84f', '#6aa84f');
+grade.position.y = 0.01;
+scene.add(grade);
+
+// ---------- robô ----------
+function criarRobo() {
+  const r = new THREE.Group();
+  const mat = c => new THREE.MeshLambertMaterial({ color: c });
+  const corpo = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 0.7), mat('#ff4fc8'));
+  corpo.position.y = 0.38; corpo.castShadow = true; r.add(corpo);
+  const cabeca = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.5), mat('#ffffff'));
+  cabeca.position.y = 0.78; cabeca.castShadow = true; r.add(cabeca);
+  // olhos (frente = +Z)
+  for (const x of [-0.13, 0.13]) {
+    const olho = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), mat('#222'));
+    olho.position.set(x, 0.8, 0.26); r.add(olho);
+  }
+  const antena = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), mat('#ffd400'));
+  antena.position.y = 1.05; r.add(antena);
+  // rodas
+  for (const x of [-0.4, 0.4]) {
+    const roda = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.1, 20), mat('#333'));
+    roda.rotation.z = Math.PI / 2; roda.position.set(x, 0.18, 0); roda.castShadow = true;
+    r.add(roda);
+  }
+  return r;
+}
+const robo = criarRobo();
+scene.add(robo);
+
+// rastro
+const rastroMat = new THREE.LineBasicMaterial({ color: '#ff4fc8' });
+let rastroPts = [], rastro = null;
+function atualizarRastro() {
+  if (rastro) scene.remove(rastro);
+  rastro = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rastroPts), rastroMat);
+  scene.add(rastro);
+}
+
+// ---------- execução ----------
+let fila = [], atual = null, indice = -1;
+
+function reiniciar() {
+  fila = []; atual = null; indice = -1;
+  robo.position.set(0, 0, 0); robo.rotation.y = 0;
+  rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
+}
+
+function proximo() {
+  indice++;
+  if (indice >= fila.length) { atual = null; parent.postMessage({ tipo: 'fim' }, '*'); return; }
+  const { cmd, n } = fila[indice];
+  parent.postMessage({ tipo: 'passo', indice }, '*');
+  const dir = new THREE.Vector3(Math.sin(robo.rotation.y), 0, Math.cos(robo.rotation.y));
+  const lim = TAM / 2 - 0.5;
+  if (cmd === 'frente' || cmd === 'tras') {
+    const alvo = robo.position.clone().addScaledVector(dir, (cmd === 'frente' ? 1 : -1) * n * PASSO);
+    alvo.x = Math.max(-lim, Math.min(lim, alvo.x));
+    alvo.z = Math.max(-lim, Math.min(lim, alvo.z));
+    atual = { tipo: 'mover', de: robo.position.clone(), para: alvo, t: 0,
+              dur: Math.max(0.15, alvo.distanceTo(robo.position) / VEL_MOVE) };
+  } else if (cmd === 'esquerda' || cmd === 'direita') {
+    const ang = (cmd === 'esquerda' ? 1 : -1) * n * Math.PI / 2;
+    atual = { tipo: 'girar', de: robo.rotation.y, para: robo.rotation.y + ang, t: 0,
+              dur: Math.abs(ang) / VEL_GIRO };
+  } else {
+    atual = { tipo: 'espera', t: 0, dur: 0.2 };
+  }
+}
+
+const relogio = new THREE.Clock();
+function animar() {
+  requestAnimationFrame(animar);
+  const dt = relogio.getDelta();
+  if (atual) {
+    atual.t = Math.min(atual.dur, atual.t + dt);
+    const k = atual.t / atual.dur, e = k < .5 ? 2*k*k : 1 - (-2*k+2)**2/2; // ease
+    if (atual.tipo === 'mover') {
+      robo.position.lerpVectors(atual.de, atual.para, e);
+      robo.position.y = Math.abs(Math.sin(k * Math.PI * 4)) * 0.05; // pulinho
+    } else if (atual.tipo === 'girar') {
+      robo.rotation.y = atual.de + (atual.para - atual.de) * e;
+    }
+    if (atual.t >= atual.dur) {
+      if (atual.tipo === 'mover') {
+        robo.position.y = 0;
+        rastroPts.push(robo.position.clone().setY(0.03)); atualizarRastro();
+      }
+      proximo();
+    }
+  }
+  renderer.render(scene, camera);
+}
+
+function redimensionar() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.position.set(5, 7, 7).multiplyScalar(w < h ? 1.4 : 1); // retrato: afasta
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', redimensionar);
+
+addEventListener('message', ({ data }) => {
+  if (!data || !data.tipo) return;
+  if (data.tipo === 'executar') { reiniciar(); fila = data.comandos || []; proximo(); }
+  else if (data.tipo === 'parar') { fila = []; atual = null; }
+  else if (data.tipo === 'reiniciar') reiniciar();
+});
+
+redimensionar();
+reiniciar();
+animar();
+parent.postMessage({ tipo: 'pronto' }, '*');
+</script>
+</body>
+</html>

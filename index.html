@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#ffd400">
+<title>STEMEDU32</title>
+<style>
+  :root{
+    --amarelo:#ffc61a; --amarelo-esc:#c99700;
+    --rosa:#ff4fc8;    --rosa-esc:#b8238c;
+    --fundo:#fff8e6;   --trilho:#ffffff;
+    --texto:#333;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;background:var(--fundo);color:var(--texto);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  body{display:flex;flex-direction:column;height:100dvh}
+
+  /* barra superior */
+  header{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--amarelo)}
+  header h1{font-size:18px;margin:0;flex:1}
+  .btn{border:0;border-radius:14px;min-width:48px;height:48px;padding:0 12px;font-size:22px;
+    background:#fff;box-shadow:0 3px 0 rgba(0,0,0,.2);cursor:pointer}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+  .btn.ligado{background:#5bd65b}
+
+  /* simulador */
+  #sim{flex:1 1 40%;min-height:180px;position:relative}
+  #sim iframe{border:0;width:100%;height:100%;display:block}
+
+  /* área de montagem (programa) */
+  #programa{flex:0 0 auto;background:var(--trilho);border-top:4px solid #f0e2b8;border-bottom:4px solid #f0e2b8;
+    overflow-x:auto;overflow-y:hidden;padding:14px 16px 10px;white-space:nowrap;min-height:128px;
+    touch-action:pan-x}
+  #trilho{display:inline-flex;align-items:flex-start;padding-right:80px}
+
+  /* paleta */
+  #paleta{flex:0 0 auto;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;padding:10px 8px 16px;
+    background:#ffe9f7}
+
+  /* bloco */
+  .bloco{position:relative;width:86px;height:100px;flex:0 0 auto;margin-left:-12px;touch-action:none;cursor:grab}
+  .bloco:first-child{margin-left:0}
+  #paleta .bloco{margin-left:0}
+  .bloco svg{position:absolute;left:0;top:0;width:86px;height:64px;overflow:visible}
+  .bloco .num{position:absolute;left:14px;top:56px;width:46px;height:32px;border-radius:16px;
+    background:#fff;border:3px solid var(--rosa-esc);font:700 20px/26px system-ui;text-align:center}
+  .bloco.ativo svg{filter:drop-shadow(0 0 6px #00b7ff) drop-shadow(0 0 6px #00b7ff)}
+  .bloco.fantasma{position:fixed;z-index:10;pointer-events:none;opacity:.85;margin:0;transform:scale(1.1)}
+  .bloco.arrastando{opacity:.25}
+  .marcador{width:6px;height:64px;border-radius:3px;background:#00b7ff;flex:0 0 auto;margin:0 4px 0 -6px}
+
+  /* lua */
+  #lua{position:fixed;inset:auto 12px 12px 12px;max-height:50vh;overflow:auto;background:#222;color:#9f9;
+    font:14px/1.4 ui-monospace,Consolas,monospace;border-radius:12px;padding:12px;white-space:pre;
+    display:none;z-index:20;user-select:text;-webkit-user-select:text}
+  #lua.aberto{display:block}
+  #aviso{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#333;color:#fff;
+    padding:8px 14px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .3s;z-index:30;pointer-events:none}
+  #aviso.mostrar{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>STEMEDU32</h1>
+  <button class="btn" id="btnLua" title="Ver código Lua">{ }</button>
+  <button class="btn" id="btnConectar" title="Conectar robô">🔌</button>
+  <button class="btn" id="btnParar" title="Parar">⏹</button>
+</header>
+
+<div id="sim"><iframe id="simFrame" src="simulador.html" title="Simulador 3D"></iframe></div>
+
+<div id="programa"><div id="trilho"></div></div>
+<div id="paleta"></div>
+
+<pre id="lua"></pre>
+<div id="aviso"></div>
+
+<script>
+// =====================================================================
+// 1. DEFINIÇÃO DOS BLOCOS
+//    Para criar um bloco novo: adicionar aqui (cor, ícone, como vira Lua).
+// =====================================================================
+const CORES = {
+  inicio:   ['var(--amarelo)', 'var(--amarelo-esc)'],
+  movimento:['var(--rosa)',    'var(--rosa-esc)'],
+};
+
+// ícones desenhados em SVG (centro do bloco ~ x=36, y=32)
+const ICONES = {
+  play:     '<path d="M30 18 L52 32 L30 46 Z" fill="#3ec43e" stroke="#1d7a1d" stroke-width="3" stroke-linejoin="round"/>',
+  frente:   '<path d="M36 14 L50 30 H41 V50 H31 V30 H22 Z" fill="#fff"/>',
+  tras:     '<path d="M36 50 L50 34 H41 V14 H31 V34 H22 Z" fill="#fff"/>',
+  esquerda: '<path d="M46 44 A13 13 0 1 0 26 30" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M17 26 L28 18 L32 32 Z" fill="#fff"/>',
+  direita:  '<path d="M26 44 A13 13 0 1 1 46 30" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M55 26 L44 18 L40 32 Z" fill="#fff"/>',
+};
+
+const BLOCOS = {
+  play:     { grupo:'inicio',    icone:'play',     lua: ()  => null },
+  frente:   { grupo:'movimento', icone:'frente',   lua: n => `frente(${n})`,   n:1 },
+  tras:     { grupo:'movimento', icone:'tras',     lua: n => `tras(${n})`,     n:1 },
+  esquerda: { grupo:'movimento', icone:'esquerda', lua: n => `esquerda(${n})`, n:1 },
+  direita:  { grupo:'movimento', icone:'direita',  lua: n => `direita(${n})`,  n:1 },
+};
+
+// formatos (encaixe tipo quebra-cabeça: dente à direita, cavidade à esquerda)
+const DENTE = 'V20 C80 20 84 26 84 32 C84 38 80 44 72 44 V56 Q72 64 64 64';
+const FORMA_MEIO   = `M8 0 H64 Q72 0 72 8 ${DENTE} H8 Q0 64 0 56 V44 C8 44 12 38 12 32 C12 26 8 20 0 20 V8 Q0 0 8 0 Z`;
+const FORMA_INICIO = `M32 0 H64 Q72 0 72 8 ${DENTE} H32 A32 32 0 0 1 32 0 Z`;
+
+// =====================================================================
+// 2. ESTADO + DESENHO
+// =====================================================================
+let programa = [ { tipo:'play' } ];      // o primeiro é sempre o Play
+const trilho = document.getElementById('trilho');
+const paleta = document.getElementById('paleta');
+
+function criarBlocoEl(tipo, n) {
+  const def = BLOCOS[tipo];
+  const [cor, borda] = CORES[def.grupo];
+  const el = document.createElement('div');
+  el.className = 'bloco';
+  el.dataset.tipo = tipo;
+  el.innerHTML =
+    `<svg viewBox="0 0 86 64"><path d="${def.grupo === 'inicio' ? FORMA_INICIO : FORMA_MEIO}"
+       fill="${cor}" stroke="${borda}" stroke-width="3"/>${ICONES[def.icone]}</svg>` +
+    (def.n !== undefined ? `<div class="num">${n ?? def.n}</div>` : '');
+  return el;
+}
+
+function desenhar() {
+  trilho.innerHTML = '';
+  programa.forEach((b, i) => {
+    const el = criarBlocoEl(b.tipo, b.n);
+    el.dataset.i = i;
+    trilho.appendChild(el);
+  });
+  document.getElementById('lua').textContent = gerarLua();
+}
+
+Object.keys(BLOCOS).filter(t => t !== 'play').forEach(t => paleta.appendChild(criarBlocoEl(t)));
+
+// =====================================================================
+// 3. GERAÇÃO DE LUA
+// =====================================================================
+function comandos() {
+  return programa.slice(1).map(b => ({ cmd: b.tipo, n: b.n }));
+}
+function gerarLua() {
+  return ['-- programa STEMEDU32', ...programa.map(b => BLOCOS[b.tipo].lua(b.n)).filter(Boolean)].join('\n');
+}
+
+// =====================================================================
+// 4. INTERAÇÃO: tocar e arrastar (pointer events = mouse + toque)
+// =====================================================================
+let arraste = null; // { origem:'paleta'|'programa', tipo, n, i, el, fantasma, x0, y0, dx, dy }
+let marcador = null;
+
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.bloco');
+  if (!el || el.classList.contains('fantasma')) return;
+  const noPrograma = trilho.contains(el);
+  const i = noPrograma ? +el.dataset.i : -1;
+  const r = el.getBoundingClientRect();
+  arraste = {
+    origem: noPrograma ? 'programa' : 'paleta', el, i,
+    tipo: el.dataset.tipo, n: noPrograma ? programa[i].n : BLOCOS[el.dataset.tipo].n,
+    x0: e.clientX, y0: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top,
+    alvoNum: e.target.closest('.num'), fantasma: null,
+  };
+});
+
+document.addEventListener('pointermove', e => {
+  if (!arraste) return;
+  if (!arraste.fantasma) {
+    if (Math.hypot(e.clientX - arraste.x0, e.clientY - arraste.y0) < 8) return;
+    if (arraste.tipo === 'play') { arraste = null; return; } // Play não sai do lugar
+    arraste.fantasma = criarBlocoEl(arraste.tipo, arraste.n);
+    arraste.fantasma.classList.add('fantasma');
+    document.body.appendChild(arraste.fantasma);
+    if (arraste.origem === 'programa') arraste.el.classList.add('arrastando');
+  }
+  arraste.fantasma.style.left = (e.clientX - arraste.dx) + 'px';
+  arraste.fantasma.style.top  = (e.clientY - arraste.dy) + 'px';
+  mostrarMarcador(indiceSoltar(e.clientX, e.clientY));
+});
+
+document.addEventListener('pointerup', e => {
+  if (!arraste) return;
+  const a = arraste; arraste = null;
+  esconderMarcador();
+
+  if (!a.fantasma) { tocar(a); return; } // foi só um toque
+  a.fantasma.remove();
+
+  const destino = indiceSoltar(e.clientX, e.clientY);
+  const bloco = a.origem === 'programa' ? programa[a.i] : { tipo: a.tipo, n: a.n };
+  if (a.origem === 'programa') programa.splice(a.i, 1);
+  if (destino !== null) {
+    let d = destino;
+    if (a.origem === 'programa' && a.i < destino) d--;
+    programa.splice(Math.max(1, d), 0, bloco);
+  }
+  desenhar();
+});
+
+document.addEventListener('pointercancel', () => {
+  if (arraste?.fantasma) arraste.fantasma.remove();
+  arraste = null; esconderMarcador(); desenhar();
+});
+
+function tocar(a) {
+  if (a.tipo === 'play') { executar(); return; }
+  if (a.origem === 'paleta') {             // toque na paleta = adiciona no fim
+    programa.push({ tipo: a.tipo, n: a.n });
+    desenhar();
+    const p = document.getElementById('programa'); p.scrollLeft = p.scrollWidth;
+  } else if (a.alvoNum) {                   // toque no número = 1..9
+    const b = programa[a.i]; b.n = b.n % 9 + 1; desenhar();
+  }
+}
+
+// onde o bloco entraria se fosse solto em (x,y)? null = fora (apaga)
+function indiceSoltar(x, y) {
+  const area = document.getElementById('programa').getBoundingClientRect();
+  if (y < area.top - 30 || y > area.bottom + 30) return null;
+  const els = [...trilho.querySelectorAll('.bloco')];
+  for (let i = 1; i < els.length; i++) {
+    const r = els[i].getBoundingClientRect();
+    if (x < r.left + r.width / 2) return i;
+  }
+  return els.length;
+}
+
+function mostrarMarcador(i) {
+  esconderMarcador();
+  if (i === null) return;
+  marcador = document.createElement('div');
+  marcador.className = 'marcador';
+  trilho.insertBefore(marcador, trilho.children[i] || null);
+}
+function esconderMarcador() { marcador?.remove(); marcador = null; }
+
+// =====================================================================
+// 5. SIMULADOR (iframe) — conversa por postMessage
+// =====================================================================
+const simFrame = document.getElementById('simFrame');
+function paraSim(msg) { simFrame.contentWindow?.postMessage(msg, '*'); }
+
+addEventListener('message', ({ data }) => {
+  if (!data?.tipo) return;
+  if (data.tipo === 'passo') destacar(data.indice + 1);
+  if (data.tipo === 'fim') destacar(-1);
+});
+
+function destacar(i) {
+  trilho.querySelectorAll('.bloco').forEach((el, j) => el.classList.toggle('ativo', j === i));
+}
+
+function executar() {
+  destacar(0);
+  paraSim({ tipo: 'executar', comandos: comandos() });
+  if (porta) enviarParaRobo();
+}
+
+document.getElementById('btnParar').onclick = () => {
+  paraSim({ tipo: 'reiniciar' }); destacar(-1);
+  if (porta) escreverLinha('parar');
+};
+document.getElementById('btnLua').onclick = () =>
+  document.getElementById('lua').classList.toggle('aberto');
+
+// =====================================================================
+// 6. CONEXÃO COM O MICROCONTROLADOR (Web Serial — Chrome/Edge desktop e Android)
+//    Protocolo: "inicio" \n  <linhas lua>  \n "fim"
+// =====================================================================
+let porta = null, escritor = null;
+
+document.getElementById('btnConectar').onclick = async () => {
+  if (porta) { await desconectar(); return; }
+  if (!('serial' in navigator)) { aviso('Este navegador não suporta Web Serial (use Chrome/Edge)'); return; }
+  try {
+    porta = await navigator.serial.requestPort();
+    await porta.open({ baudRate: 115200 });
+    escritor = porta.writable.getWriter();
+    document.getElementById('btnConectar').classList.add('ligado');
+    aviso('Robô conectado!');
+    lerRespostas();
+  } catch (err) { porta = null; aviso('Não conectou: ' + err.message); }
+};
+
+async function desconectar() {
+  try { escritor?.releaseLock(); await porta.close(); } catch {}
+  porta = escritor = null;
+  document.getElementById('btnConectar').classList.remove('ligado');
+  aviso('Desconectado');
+}
+
+const codificador = new TextEncoder();
+async function escreverLinha(t) { await escritor?.write(codificador.encode(t + '\n')); }
+
+async function enviarParaRobo() {
+  await escreverLinha('inicio');
+  for (const linha of gerarLua().split('\n')) if (!linha.startsWith('--')) await escreverLinha(linha);
+  await escreverLinha('fim');
+}
+
+async function lerRespostas() {   // mostra no console o que o firmware responder
+  const leitor = porta.readable.pipeThrough(new TextDecoderStream()).getReader();
+  try { for (;;) { const { value, done } = await leitor.read(); if (done) break; console.log('[robô]', value); } }
+  catch {} finally { leitor.releaseLock(); }
+}
+
+// =====================================================================
+function aviso(t) {
+  const a = document.getElementById('aviso');
+  a.textContent = t; a.classList.add('mostrar');
+  clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.remove('mostrar'), 2200);
+}
+
+desenhar();
+</script>
+</body>
+</html>
