@@ -361,6 +361,7 @@ function reiniciar() {
   lampada(false);
   apagarPisos();
   estrelasPegas = new Set();
+  paredeNaFrente = temParedeNaFrente();   // parede que já está na frente no começo não conta
   for (const m of Object.values(malhas)) m.visible = true;
   rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
 }
@@ -369,7 +370,22 @@ function direcaoRobo() {
   return new THREE.Vector3(Math.round(Math.sin(robo.rotation.y)), 0, Math.round(Math.cos(robo.rotation.y)));
 }
 
+// Sensor de parede: dispara no momento em que passa a existir uma parede na casa
+// da frente do robô (depois de andar ou girar). Bater na parede não dispara.
+let paredeNaFrente = false;
+function temParedeNaFrente() {
+  const f = robo.position.clone().setY(0).add(direcaoRobo()).round();
+  return cenario[chaveCasa(f.x, f.z)] === 'parede';
+}
+function verificarFrente() {
+  const agora = temParedeNaFrente(), apareceu = agora && !paredeNaFrente;
+  paredeNaFrente = agora;
+  if (apareceu) tocou('parede');
+  return apareceu;
+}
+
 function proximo() {
+  if (verificarFrente()) return;   // reação de parede roda antes do próximo comando
   indice++;
   if (indice >= fila.length) { atual = null; parent.postMessage({ tipo: 'fim' }, '*'); return; }
   const { cmd, n } = fila[indice];
@@ -397,8 +413,7 @@ function andarUmaCasa(sentido, restam) {
   const fora = Math.abs(para.x) > LIM || Math.abs(para.z) > LIM;
   if (fora || cenario[k] === 'parede') {
     // bate e volta: não entra na casa
-    atual = { tipo: 'bater', de, para: de.clone().lerp(para, 0.3), t: 0, dur: 0.35,
-              tocou: fora ? null : 'parede' };
+    atual = { tipo: 'bater', de, para: de.clone().lerp(para, 0.3), t: 0, dur: 0.35 };
     return;
   }
   atual = { tipo: 'mover', de, para, t: 0, dur: PASSO / VEL_MOVE, sentido, restam: restam - 1 };
@@ -450,7 +465,7 @@ function animar() {
     if (atual.t >= atual.dur) {
       const a = atual;
       if (a.tipo === 'mover') chegouNaCasa(a);
-      else if (a.tipo === 'bater') { robo.position.copy(a.de); a.tocou ? tocou(a.tocou) : proximo(); }
+      else if (a.tipo === 'bater') { robo.position.copy(a.de); proximo(); }
       else if (a.tipo === 'afundar') {
         robo.visible = false; atual = null; fila = [];
         parent.postMessage({ tipo: 'caiu' }, '*');
