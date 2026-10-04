@@ -170,6 +170,26 @@ function lampada(acesa) {
   antena.material.emissive.set(acesa ? '#ffd400' : '#000000');
   antena.scale.setScalar(acesa ? 1.8 : 1);
   brilho.intensity = acesa ? 3 : 0;
+  if (acesa) iluminarPisos();
+}
+
+// pisos pretos na casa do robô e nas 8 em volta ficam amarelos (e continuam até reiniciar)
+const COR_ACESO = '#ffd400';
+function iluminarPisos() {
+  const rx = Math.round(robo.position.x), rz = Math.round(robo.position.z);
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+    const k = chaveCasa(rx + dx, rz + dz);
+    if (cenario[k] === 'chao_preto' && malhas[k]) {
+      malhas[k].material.color.set(COR_ACESO);
+      malhas[k].material.emissive?.set('#6b5a00');
+    }
+  }
+}
+function apagarPisos() {
+  for (const [k, m] of Object.entries(malhas)) if (cenario[k] === 'chao_preto') {
+    m.material.color.set(TERRENOS.chao_preto.cor);
+    m.material.emissive?.set('#000000');
+  }
 }
 
 // rastro
@@ -192,6 +212,7 @@ const TERRENOS = {
   chao_vermelho: { cor: '#ff5a4f' },
   chao_azul:     { cor: '#3d8bff' },
   chao_verde:    { cor: '#2fbf5b' },
+  chao_preto:    { cor: '#222222' },   // reage à luz: fica amarelo quando a lâmpada do robô acende perto
 };
 const chaveCasa = (x, z) => `${x},${z}`;
 let cenario = {};                 // "x,z" -> tipo de terreno
@@ -336,6 +357,7 @@ function reiniciar() {
   fila = []; atual = null; indice = -1;
   robo.position.set(0, 0, 0); robo.rotation.y = ROT_INICIAL; robo.visible = true;
   lampada(false);
+  apagarPisos();
   estrelasPegas = new Set();
   for (const m of Object.values(malhas)) m.visible = true;
   rastroPts = [robo.position.clone().setY(0.03)]; atualizarRastro();
