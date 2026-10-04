@@ -191,7 +191,7 @@ function desenhar() {
     });
     wsInterno.appendChild(el);
   });
-  aplicarVista();
+  desenharVista();
   document.getElementById('lua').textContent = gerarLua();
 }
 
@@ -201,21 +201,9 @@ function arrumar() {
 }
 
 // ---------- vista (pan) ----------
-// O workspace não tem tamanho fixo: a vista desloca por (vistaX, vistaY).
-// O limite é calculado a partir dos blocos, para nunca "perder" tudo de vista.
+// O workspace não tem tamanho nem limite: a vista desloca livre por (vistaX, vistaY).
+// Se a criança se perder, o minimapa aparece e leva de volta a todos os blocos.
 let vistaX = 0, vistaY = 0;
-const VISIVEL = 80;   // pelo menos isso dos blocos fica sempre na tela
-
-function limitesVista() {
-  if (!cadeias.length) return { x0: 0, x1: 0, y0: 0, y1: 0 };
-  const minX = Math.min(...cadeias.map(c => c.x)), maxX = Math.max(...cadeias.map(c => c.x + larguraCadeia(c)));
-  const minY = Math.min(...cadeias.map(c => c.y)), maxY = Math.max(...cadeias.map(c => c.y + ALT_BLOCO));
-  // dá para empurrar os blocos para qualquer lado até sobrar só um pedaço visível
-  // (coordenadas do workspace × zoom = pixels na tela)
-  const x0 = VISIVEL - maxX * zoom, y0 = VISIVEL - maxY * zoom;
-  return { x0, x1: Math.max(x0, ws.clientWidth  - VISIVEL - minX * zoom),
-           y0, y1: Math.max(y0, ws.clientHeight - VISIVEL - minY * zoom) };
-}
 
 // ---------- zoom ----------
 let zoom = 1;
@@ -237,13 +225,6 @@ function pontoWs(x, y) {
 
 const limitar = (v, a, b) => Math.min(b, Math.max(a, v));
 
-// elástico: passou do limite, anda cada vez menos (resistência), como puxar uma borracha
-const ELASTICO = 160;
-function elastico(v, a, b) {
-  const puxa = d => ELASTICO * (1 - 1 / (d / ELASTICO + 1));
-  return v < a ? a - puxa(a - v) : v > b ? b + puxa(v - b) : v;
-}
-
 function desenharVista() {
   wsInterno.style.transform = `translate(${vistaX}px, ${vistaY}px) scale(${zoom})`;
   ws.style.backgroundPosition = `${vistaX}px ${vistaY}px`;   // pontinhos acompanham
@@ -251,32 +232,9 @@ function desenharVista() {
   atualizarMinimapa();
 }
 
-function aplicarVista() {
-  if (pan) return;   // durante o arraste do fundo quem manda é o elástico
-  const l = limitesVista();
-  vistaX = limitar(vistaX, l.x0, l.x1);
-  vistaY = limitar(vistaY, l.y0, l.y1);
-  desenharVista();
-}
+function moverVista(dx, dy) { vistaX += dx; vistaY += dy; desenharVista(); }
 
-function moverVista(dx, dy) { vistaX += dx; vistaY += dy; aplicarVista(); }
-
-// solta o elástico: volta suavemente para dentro do limite
-let animVolta = 0;
-function voltarElastico() {
-  const l = limitesVista();
-  const x0 = vistaX, y0 = vistaY, x1 = limitar(vistaX, l.x0, l.x1), y1 = limitar(vistaY, l.y0, l.y1);
-  if (x0 === x1 && y0 === y1) return;
-  const t0 = performance.now(), dur = 350;
-  cancelAnimationFrame(animVolta);
-  const passo = agora => {
-    const k = Math.min(1, (agora - t0) / dur), e = 1 - (1 - k) ** 3;   // desacelera no fim
-    vistaX = x0 + (x1 - x0) * e; vistaY = y0 + (y1 - y0) * e;
-    desenharVista();
-    if (k < 1) animVolta = requestAnimationFrame(passo);
-  };
-  animVolta = requestAnimationFrame(passo);
-}
+let animVolta = 0;   // animação de vista em andamento (minimapa)
 
 Object.keys(BLOCOS).forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor })));
 
@@ -502,7 +460,6 @@ ws.addEventListener('pointerdown', e => {
 ws.addEventListener('pointermove', e => {
   if (!dedos.has(e.pointerId)) return;
   dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  const l = limitesVista();
   if (pan.pinca) {
     const [a, b] = [...dedos.values()];
     const m = pontoWs((a.x + b.x) / 2, (a.y + b.y) / 2);
@@ -511,15 +468,14 @@ ws.addEventListener('pointermove', e => {
     vistaX = m.x - pan.mundoX * zoom;
     vistaY = m.y - pan.mundoY * zoom;
   } else {
-    vistaX = elastico(pan.vx + e.clientX - pan.x0, l.x0, l.x1);
-    vistaY = elastico(pan.vy + e.clientY - pan.y0, l.y0, l.y1);
+    vistaX = pan.vx + e.clientX - pan.x0;
+    vistaY = pan.vy + e.clientY - pan.y0;
   }
   desenharVista();
 });
 const fimPan = e => {
   if (!dedos.delete(e.pointerId)) return;
   iniciarGesto();                 // saiu 1 dos 2 dedos: continua arrastando com o outro
-  if (!pan) voltarElastico();
 };
 ws.addEventListener('pointerup', fimPan);
 ws.addEventListener('pointercancel', fimPan);
@@ -528,7 +484,7 @@ ws.addEventListener('wheel', e => {
   if (e.ctrlKey) {   // Ctrl + roda (e pinça do touchpad) = zoom
     const p = pontoWs(e.clientX, e.clientY);
     zoomEm(zoom * Math.exp(-e.deltaY * 0.01), p.x, p.y);
-    aplicarVista();
+    desenharVista();
   } else moverVista(-(e.shiftKey ? e.deltaY : e.deltaX), e.shiftKey ? 0 : -e.deltaY);
 }, { passive: false });
 
@@ -683,7 +639,7 @@ function alturaSim(h) {
   const livre = sim.offsetHeight + ws.offsetHeight;   // espaço dividido entre os dois
   h = limitar(h, MIN_SIM, livre - MIN_WS);
   sim.style.flexBasis = h + 'px';
-  aplicarVista();
+  desenharVista();
   try { localStorage.setItem('alturaSim', h); } catch {}
 }
 
