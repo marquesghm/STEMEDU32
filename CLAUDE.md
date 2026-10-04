@@ -8,6 +8,7 @@ Detalhes de design e protocolo em [PLANO.md](PLANO.md).
 - **UX é foco principal.** Público de ~7 anos, celular/tablet, dedo.
   - Sugestões minhas de UX: **perguntar antes** de implementar.
   - Se uma solução pedida for fraca em UX: **avisar** (motivo + alternativa) antes de seguir.
+  - Ao apontar falha ou sugestão de UX: **ser direto** — 1 ou 2 linhas, sem textão.
 - **Modo simplificado é o padrão da conversa.** Pedidos sobre o editor sem modo explícito
   referem-se ao modo simplificado (blocos sem número, um único Play fixo fora da paleta,
   início de função criado automaticamente). Perguntar se deve valer também no avançado
