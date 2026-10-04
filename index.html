@@ -28,9 +28,10 @@
   /* simulador */
   #sim{flex:0 1 38%;min-height:60px;position:relative}
   /* divisor arrastável entre simulador e workspace */
-  #divisor{flex:0 0 auto;height:22px;background:#f0e2b8;display:flex;align-items:center;justify-content:center;
-    touch-action:none;cursor:ns-resize}
-  #divisor::before{content:"";width:56px;height:6px;border-radius:3px;background:#c9b27a}
+  #divisor{flex:0 0 auto;height:7px;background:#f0e2b8;display:flex;align-items:center;justify-content:center;
+    touch-action:none;cursor:ns-resize;position:relative;z-index:2}
+  #divisor::before{content:"";width:48px;height:3px;border-radius:2px;background:#c9b27a}
+  #divisor::after{content:"";position:absolute;inset:-12px 0}   /* área de toque maior que a linha */
   #divisor.ativo{background:#e6d29a}
   body.redimensionando #simFrame{pointer-events:none}   /* iframe não "rouba" o dedo */
   #sim iframe{border:0;width:100%;height:100%;display:block}
