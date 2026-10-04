@@ -70,6 +70,8 @@
   .bloco svg{position:absolute;left:0;top:0;width:86px;height:64px;overflow:visible}
   .bloco .num{position:absolute;left:14px;top:56px;width:46px;height:32px;border-radius:16px;
     background:#fff;border:3px solid var(--rosa-esc);font:700 20px/26px system-ui;text-align:center}
+  body.simples .bloco .num{display:none}   /* modo simplificado: sem número */
+  body.simples .bloco{height:68px}
   .bloco.ativo svg{filter:drop-shadow(0 0 6px #00b7ff) drop-shadow(0 0 6px #00b7ff)}
   .bloco.arrastando{opacity:.25}
   .fantasma{position:fixed;transform-origin:0 0;z-index:10;pointer-events:none;opacity:.85;display:flex;align-items:flex-start}
@@ -105,6 +107,7 @@
 <nav id="menu">
   <button id="btnConectar"><span>🔌</span><b>Conectar robô</b></button>
   <button id="btnLua"><span>{ }</span><b>Mostrar código</b></button>
+  <button id="btnModo"><span>🧸</span><b>Modo simplificado</b></button>
   <button id="btnLimpar"><span>🗑️</span><b>Limpar tudo</b></button>
 </nav>
 
@@ -262,7 +265,33 @@ function moverVista(dx, dy) { vistaX += dx; vistaY += dy; desenharVista(); }
 
 let animVolta = 0;   // animação de vista em andamento (minimapa)
 
-Object.keys(BLOCOS).forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor })));
+// ---------- modo simplificado ----------
+// Blocos sem número (cada um faz uma ação só, n = 1) e um único Play, já no workspace e fora da paleta.
+let simples = false;
+const valorN = b => simples ? 1 : b.n;
+
+function montarPaleta() {
+  paleta.innerHTML = '';
+  Object.keys(BLOCOS)
+    .filter(t => !(simples && t === 'play'))
+    .forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor })));
+}
+
+function definirModoSimples(ligar) {
+  simples = ligar;
+  document.body.classList.toggle('simples', ligar);
+  document.querySelector('#btnModo b').textContent = ligar ? 'Modo completo' : 'Modo simplificado';
+  if (ligar && !cadeias.some(c => c.blocos[0].tipo === 'play')) {
+    // garante o Play: no canto de cima, acima de tudo que já existe
+    const y = cadeias.length ? Math.min(...cadeias.map(c => c.y)) - ALT_BLOCO - 12 : 20;
+    cadeias.unshift({ x: 20, y, blocos: [novoBloco('play')] });
+    ultimaCadeia = cadeias[0];
+  }
+  try { localStorage.setItem('modoSimples', ligar ? '1' : ''); } catch {}
+  montarPaleta();
+  desenhar();
+}
+montarPaleta();
 
 // =====================================================================
 // 4. EXECUÇÃO / GERAÇÃO DE LUA
@@ -277,7 +306,7 @@ const MAX_PROFUNDIDADE = 8, MAX_COMANDOS = 300;   // proteção contra função 
 function comandos(cadeia, prof = 0, saida = []) {
   for (const b of cadeia.blocos) {
     if (saida.length >= MAX_COMANDOS) break;
-    if (MOVIMENTOS.includes(b.tipo)) saida.push({ cmd: b.tipo, n: b.n, id: b.id });
+    if (MOVIMENTOS.includes(b.tipo)) saida.push({ cmd: b.tipo, n: valorN(b), id: b.id });
     else if (b.tipo === 'chamar') {
       saida.push({ cmd: 'pular', id: b.id });
       const f = cadeiaFuncao(b.cor);
@@ -293,7 +322,7 @@ function comandos(cadeia, prof = 0, saida = []) {
 function luaDe(blocos, ind = '') {
   const linhas = [];
   for (const b of blocos) {
-    if (MOVIMENTOS.includes(b.tipo)) linhas.push(`${ind}${b.tipo}(${b.n})`);
+    if (MOVIMENTOS.includes(b.tipo)) linhas.push(`${ind}${b.tipo}(${valorN(b)})`);
     else if (b.tipo === 'chamar') linhas.push(`${ind}f_${b.cor}()`);
   }
   return linhas;
@@ -373,6 +402,9 @@ document.addEventListener('pointerup', e => {
   const fx = parseFloat(a.fantasma.style.left), fy = parseFloat(a.fantasma.style.top);
   a.fantasma.remove();
   const encaixe = sobrePaleta(e) ? null : acharEncaixe(fx, fy, a);
+
+  // modo simplificado: o único Play não pode ser apagado (volta para onde estava)
+  if (simples && sobrePaleta(e) && a.blocos[0].tipo === 'play') { desenhar(); return; }
 
   // tira os blocos da cadeia de origem
   if (!a.daPaleta) cadeias[a.ci].blocos.splice(a.bi);
@@ -655,6 +687,11 @@ document.getElementById('btnMenu').onclick = () => menu.classList.toggle('aberto
 document.addEventListener('pointerdown', e => {
   if (!menu.contains(e.target) && !e.target.closest('#btnMenu')) menu.classList.remove('aberto');
 }, true);
+document.getElementById('btnModo').onclick = () => {
+  menu.classList.remove('aberto');
+  definirModoSimples(!simples);
+};
+
 // limpar: volta ao começo (só um Play), com vista e zoom iniciais e robô no centro
 document.getElementById('btnLimpar').onclick = () => {
   menu.classList.remove('aberto');
@@ -755,7 +792,9 @@ divisor.addEventListener('pointercancel', fimDivisao);
 
 try { const h = +localStorage.getItem('alturaSim'); if (h) sim.style.flexBasis = h + 'px'; } catch {}
 
-desenhar();
+let modoSalvo = false;
+try { modoSalvo = !!localStorage.getItem('modoSimples'); } catch {}
+if (modoSalvo) definirModoSimples(true); else desenhar();
 </script>
 </body>
 </html>
