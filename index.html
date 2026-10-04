@@ -72,6 +72,8 @@
   .bloco svg{position:absolute;left:0;top:0;width:86px;height:64px;overflow:visible}
   .bloco .num{position:absolute;left:14px;top:56px;width:46px;height:32px;border-radius:16px;
     background:#fff;border:3px solid var(--rosa-esc);font:700 20px/26px system-ui;text-align:center}
+  /* dentro do construtor de cenários: só workspace + paleta */
+  body.modo-cenario header, body.modo-cenario #sim, body.modo-cenario #divisor{display:none}
   body.simples .bloco .num{display:none}   /* modo simplificado: sem número */
   body.simples .bloco{height:68px}
   .bloco.ativo svg{filter:drop-shadow(0 0 6px #00b7ff) drop-shadow(0 0 6px #00b7ff)}
@@ -110,6 +112,7 @@
   <button id="btnConectar"><span>🔌</span><b>Conectar robô</b></button>
   <button id="btnLua"><span>{ }</span><b>Mostrar código</b></button>
   <button id="btnModo"><span>🧸</span><b>Modo simplificado</b></button>
+  <button id="btnCenario"><span>🏗️</span><b>Construir cenário</b></button>
   <button id="btnLimpar"><span>🗑️</span><b>Limpar tudo</b></button>
 </nav>
 
@@ -130,6 +133,7 @@
 // =====================================================================
 const CORES = {
   inicio:   ['var(--amarelo)', 'var(--amarelo-esc)'],
+  evento:   ['#ff9d1a', '#c46a00'],
   movimento:['var(--rosa)',    'var(--rosa-esc)'],
 };
 // blocos de função: a cor liga a chamada à sequência que ela executa
@@ -141,7 +145,18 @@ const CORES_FUNCAO = {
 };
 const LISTA_CORES = Object.keys(CORES_FUNCAO);
 
-const GIRO = '<path d="M47.2 41.2 A13 13 0 1 0 25 32" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>' +
+// terrenos do cenário (mesmos nomes do simulador) e seus mini desenhos (dentro do quadrado 30..62 x 14..46)
+const TERRENOS = ['parede', 'estrela', 'agua', 'chao_vermelho', 'chao_azul', 'chao_verde'];
+const MINI_TERRENO = {
+  parede:        '<rect x="34" y="18" width="24" height="24" fill="#8a8f99"/><path d="M34 26 H58 M34 34 H58 M46 18 V26 M40 26 V34 M52 26 V34 M46 34 V42" stroke="#5d626b" stroke-width="2"/>',
+  estrela:       '<path d="M46 16 L50.5 26 L61 26.5 L53 33.5 L55.5 44 L46 38.5 L36.5 44 L39 33.5 L31 26.5 L41.5 26 Z" fill="#ffd400" stroke="#c99700" stroke-width="1.5" stroke-linejoin="round"/>',
+  agua:          '<path d="M46 16 C52 26 57 31 57 36 A11 11 0 0 1 35 36 C35 31 40 26 46 16 Z" fill="#3aa0ff"/>',
+  chao_vermelho: '<rect x="34" y="18" width="24" height="24" rx="3" fill="#ff5a4f"/>',
+  chao_azul:     '<rect x="34" y="18" width="24" height="24" rx="3" fill="#3d8bff"/>',
+  chao_verde:    '<rect x="34" y="18" width="24" height="24" rx="3" fill="#2fbf5b"/>',
+};
+
+const GIRO ='<path d="M47.2 41.2 A13 13 0 1 0 25 32" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>' +
              '<path d="M16 31 H34 L25 44 Z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>';
 // ícones desenhados em SVG (centro do bloco ~ x=36, y=32)
 const ICONES = {
@@ -154,6 +169,9 @@ const ICONES = {
   // chapéu de função: "f" grande (começo da sequência da função)
   funcao:   '<text x="44" y="46" font-size="38" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text>',
   // chamar função: "f" + seta "pula para lá"
+  // quando tocar: mãozinha + desenho do terreno (o desenho muda com o terreno do bloco)
+  tocar:    b => `<rect x="30" y="14" width="32" height="32" rx="7" fill="#fff"/>${MINI_TERRENO[b.terreno]}` +
+                 '<circle cx="28" cy="46" r="7" fill="#fff" stroke="#c46a00" stroke-width="2.5"/><circle cx="28" cy="46" r="2.5" fill="#c46a00"/>',
   chamar:   '<text x="28" y="46" font-size="34" font-weight="800" font-style="italic" font-family="Georgia,serif" fill="#fff" text-anchor="middle">f</text><path d="M38 40 Q44 22 56 24" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M52 15 L62 25 L50 31 Z" fill="#fff"/>',
 };
 
@@ -166,6 +184,8 @@ const BLOCOS = {
   direita:  { grupo:'movimento', icone:'direita',  n:1 },
   funcao:   { grupo:'funcao',    icone:'funcao',   chapeu:true, cor:'vermelho' },
   chamar:   { grupo:'funcao',    icone:'chamar',   cor:'vermelho' },
+  // "quando o robô tocar em [terreno]": começo de uma reação (toque no bloco troca o terreno)
+  tocar:    { grupo:'evento',    icone:'tocar',    chapeu:true, terreno:'parede' },
 };
 const MOVIMENTOS = ['frente', 'tras', 'esquerda', 'direita'];
 
@@ -182,7 +202,7 @@ const ENCAIXE = 40;        // distância (px) para "grudar" num encaixe
 //    O workspace é uma lista de cadeias (sequências de blocos) soltas.
 // =====================================================================
 let proxId = 1;
-const novoBloco = (tipo, extra = {}) => ({ id: proxId++, tipo, n: BLOCOS[tipo].n, cor: BLOCOS[tipo].cor, ...extra });
+const novoBloco = (tipo, extra = {}) => ({ id: proxId++, tipo, n: BLOCOS[tipo].n, cor: BLOCOS[tipo].cor, terreno: BLOCOS[tipo].terreno, ...extra });
 
 let cadeias = [ { x: 20, y: 20, blocos: [ novoBloco('play') ] } ];
 let ultimaCadeia = cadeias[0];   // onde o toque na paleta adiciona
@@ -203,7 +223,7 @@ function criarBlocoEl(b) {
   if (b.id) el.dataset.id = b.id;
   el.innerHTML =
     `<svg viewBox="0 0 86 64"><path d="${def.chapeu ? FORMA_INICIO : FORMA_MEIO}"
-       fill="${cor}" stroke="${borda}" stroke-width="3"/>${ICONES[def.icone]}</svg>` +
+       fill="${cor}" stroke="${borda}" stroke-width="3"/>${typeof ICONES[def.icone] === 'function' ? ICONES[def.icone](b) : ICONES[def.icone]}</svg>` +
     (def.n !== undefined ? `<div class="num">${b.n}</div>` : '');
   return el;
 }
@@ -227,6 +247,23 @@ function desenhar() {
   });
   desenharVista();
   document.getElementById('lua').textContent = gerarLua();
+  salvarPrograma();
+}
+
+// o programa fica salvo no navegador: é o mesmo na página de programar e no construtor de cenários
+function salvarPrograma() {
+  try { localStorage.setItem('programa', JSON.stringify({ cadeias, proxId })); } catch {}
+}
+function carregarPrograma() {
+  try {
+    const p = JSON.parse(localStorage.getItem('programa') || 'null');
+    if (!p?.cadeias?.length) return;
+    const validas = p.cadeias.filter(c => c.blocos?.length && c.blocos.every(b => BLOCOS[b.tipo]));
+    if (!validas.length) return;
+    cadeias = validas;
+    proxId = Math.max(p.proxId || 1, ...cadeias.flatMap(c => c.blocos.map(b => b.id + 1)));
+    ultimaCadeia = cadeias[0];
+  } catch {}
 }
 
 function arrumar() {
@@ -308,11 +345,20 @@ let animVolta = 0;   // animação de vista em andamento (minimapa)
 let simples = false;
 const valorN = b => simples ? 1 : b.n;
 
+// ---------- modo cenário: este editor dentro do cenario.html (index.html?modo=cenario) ----------
+// Sem header e sem simulador próprio: o simulador é o do construtor, e as mensagens vão pela página de cima.
+const MODO_CENARIO = new URLSearchParams(location.search).get('modo') === 'cenario';
+if (MODO_CENARIO) document.body.classList.add('modo-cenario');
+
+// o bloco "quando tocar" aparece na paleta no construtor, ou se já existe um cenário montado
+const temCenario = () => { try { return Object.keys(JSON.parse(localStorage.getItem('cenario') || '{}')).length > 0; } catch { return false; } };
+
 function montarPaleta() {
   paleta.innerHTML = '';
   Object.keys(BLOCOS)
     .filter(t => !(simples && (t === 'play' || t === 'funcao')))
-    .forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor })));
+    .filter(t => t !== 'tocar' || MODO_CENARIO || temCenario())
+    .forEach(t => paleta.appendChild(criarBlocoEl({ tipo: t, n: BLOCOS[t].n, cor: BLOCOS[t].cor, terreno: BLOCOS[t].terreno })));
 }
 
 function definirModoSimples(ligar) {
@@ -366,11 +412,17 @@ function luaDe(blocos, ind = '') {
   return linhas;
 }
 
+const cadeiaReacao = terreno => cadeias.find(c => c.blocos[0].tipo === 'tocar' && c.blocos[0].terreno === terreno);
+
 function gerarLua(soPlay) {
   const linhas = ['-- programa STEMEDU32'];
   for (const cor of LISTA_CORES) {
     const f = cadeiaFuncao(cor);
     if (f) linhas.push('', `function f_${cor}()`, ...luaDe(f.blocos, '  '), 'end');
+  }
+  for (const t of TERRENOS) {
+    const r = cadeiaReacao(t);
+    if (r) linhas.push('', `function ao_tocar_${t}()`, ...luaDe(r.blocos, '  '), 'end');
   }
   for (const c of soPlay ? [soPlay] : cadeiasPlay()) linhas.push('', '-- play', ...luaDe(c.blocos));
   return linhas.join('\n');
@@ -480,6 +532,10 @@ function tocar(a) {
   const c = cadeias[a.ci], b = c.blocos[a.bi];
   ultimaCadeia = c;
   if (b.tipo === 'play') executar(c);
+  else if (b.tipo === 'tocar') {                           // toque = troca o terreno
+    b.terreno = TERRENOS[(TERRENOS.indexOf(b.terreno) + 1) % TERRENOS.length];
+    desenhar();
+  }
   else if (b.tipo === 'chamar' || (b.tipo === 'funcao' && !simples)) {   // toque = troca a cor
     b.cor = LISTA_CORES[(LISTA_CORES.indexOf(b.cor) + 1) % LISTA_CORES.length];
     desenhar();
@@ -684,13 +740,32 @@ minimapa.addEventListener('click', verTudo);
 // 6. SIMULADOR (iframe) — conversa por postMessage
 // =====================================================================
 const simFrame = document.getElementById('simFrame');
-function paraSim(msg) { simFrame.contentWindow?.postMessage(msg, '*'); }
+if (MODO_CENARIO) simFrame.src = 'about:blank';   // no construtor o simulador é o da página de cima
+function paraSim(msg) {
+  if (MODO_CENARIO) parent.postMessage(msg, '*');   // o construtor repassa ao simulador dele
+  else simFrame.contentWindow?.postMessage(msg, '*');
+}
 let emExecucao = [];   // comandos enviados (para saber qual bloco destacar)
+let reacoes = 0;       // reações nesta execução (limite contra robô preso batendo para sempre)
+const MAX_REACOES = 50;
 
 addEventListener('message', ({ data }) => {
   if (!data?.tipo) return;
   if (data.tipo === 'passo') destacar(emExecucao[data.indice]?.id);
   if (data.tipo === 'fim') destacar(null);
+  if (data.tipo === 'tocou') {
+    // o robô tocou num terreno: se existe "quando tocar" dele, a reação roda logo em seguida
+    const r = cadeiaReacao(data.terreno);
+    const cmds = r && reacoes++ < MAX_REACOES ? [{ cmd: 'pular', id: r.blocos[0].id }, ...comandos(r)] : [];
+    emExecucao.splice(data.indice + 1, 0, ...cmds);   // mesma posição em que o simulador insere
+    paraSim({ tipo: 'reagir', comandos: cmds.map(({ cmd, n }) => ({ cmd, n })) });
+  }
+  if (data.tipo === 'vitoria') aviso('⭐ Desafio completo! ⭐');
+  if (data.tipo === 'caiu') aviso('💦 O robô caiu na água!');
+  if (data.tipo === 'cenarioMudou') montarPaleta();
+  // comandos vindos do construtor de cenários (botões do header dele)
+  if (data.tipo === 'executarTodos') executarTodos();
+  if (data.tipo === 'pararTudo') document.getElementById('btnParar').click();
 });
 
 function destacar(id) {
@@ -698,6 +773,7 @@ function destacar(id) {
 }
 
 function executar(cadeia) {
+  reacoes = 0;
   emExecucao = comandos(cadeia);
   destacar(cadeia.blocos[0].id);
   paraSim({ tipo: 'executar', comandos: emExecucao.map(({ cmd, n }) => ({ cmd, n })) });
@@ -708,6 +784,7 @@ function executar(cadeia) {
 function executarTodos() {
   const plays = cadeiasPlay();
   if (!plays.length) { aviso('Coloque um bloco ▶ no começo do programa'); return; }
+  reacoes = 0;
   emExecucao = plays.flatMap(c => [{ cmd: 'pular', id: c.blocos[0].id }, ...comandos(c)]);
   paraSim({ tipo: 'executar', comandos: emExecucao.map(({ cmd, n }) => ({ cmd, n })) });
   if (porta) enviarParaRobo();
@@ -725,6 +802,7 @@ document.getElementById('btnMenu').onclick = () => menu.classList.toggle('aberto
 document.addEventListener('pointerdown', e => {
   if (!menu.contains(e.target) && !e.target.closest('#btnMenu')) menu.classList.remove('aberto');
 }, true);
+document.getElementById('btnCenario').onclick = () => { location.href = 'cenario.html'; };
 document.getElementById('btnModo').onclick = () => {
   menu.classList.remove('aberto');
   definirModoSimples(!simples);
@@ -833,6 +911,7 @@ try { const h = +localStorage.getItem('alturaSim'); if (h) sim.style.flexBasis =
 // modo simplificado é o padrão; o avançado só se a pessoa escolheu antes
 let modoSalvo = null;
 try { modoSalvo = localStorage.getItem('modo'); } catch {}
+carregarPrograma();
 definirModoSimples(modoSalvo !== 'avancado');
 </script>
 </body>

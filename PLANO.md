@@ -8,7 +8,8 @@ Programação tangível na web para crianças (~7 anos). Blocos horizontais
 | Arquivo | Sistema | Responsabilidade |
 |---|---|---|
 | `index.html` | Editor + Conexão | Paleta, área de montagem, geração de Lua, envio via Web Serial |
-| `simulador.html` | Simulador 3D | Three.js + robô; recebe comandos via `postMessage` |
+| `simulador.html` | Simulador 3D | Three.js + robô + cenário; recebe comandos via `postMessage`; `?editar=1` pinta terrenos |
+| `cenario.html` | Construtor de cenários | Junta o simulador em modo edição, a paleta de terrenos e o editor (`index.html?modo=cenario`) |
 | `assets/` | Referência | Esboço visual dos blocos |
 
 `index.html` embute `simulador.html` num `<iframe>`. A única ligação entre os dois
@@ -50,6 +51,26 @@ Cada sequência (cadeia) tem posição própria.
 - Paleta: deslizar para os lados rola; puxar o bloco para cima pega.
 - Minimapa no canto quando algum bloco fica fora da tela; tocar nele mostra tudo.
 - Divisor entre simulador e workspace ajusta o tamanho dos dois.
+
+## Cenários
+Menu ☰ → **Construir cenário** abre `cenario.html`. Terrenos (uma casa cada, chão 11×11):
+
+| Terreno | Efeito pronto | Reação programável |
+|---|---|---|
+| 🧱 Parede | robô bate e não entra | sim |
+| ⭐ Estrela | é coletada; todas = desafio completo | sim |
+| 💧 Água | robô afunda e o programa acaba | — |
+| 🟥🟦🟩 Chão colorido | nenhum | sim |
+
+Bloco laranja **"quando tocar em [terreno]"** (toque troca o terreno): chapéu cujos
+blocos rodam logo que o robô toca naquele terreno (interrompe o resto do comando atual).
+Lua: `function ao_tocar_<terreno>() ... end`.
+
+Cenário (`localStorage.cenario`) e programa (`localStorage.programa`) ficam salvos no
+navegador e são os mesmos nas duas páginas.
+
+Mensagens extras simulador ↔ editor: `tocou {terreno, indice}` → `reagir {comandos}`
+(o simulador espera a resposta), `vitoria`, `caiu`, `cenarioMudou`.
 
 ## Protocolo com o microcontrolador (Web Serial, 115200)
 ```

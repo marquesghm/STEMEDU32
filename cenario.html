@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#ff9d1a">
+<title>Construir cenário</title>
+<style>
+  :root{ --laranja:#ff9d1a; --texto:#333; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;background:#fff8e6;color:var(--texto);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  body{display:flex;flex-direction:column;height:100dvh}
+
+  header{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--laranja)}
+  header h1{font-size:17px;margin:0;flex:1}
+  .btn{border:0;border-radius:14px;min-width:48px;height:48px;padding:0 12px;font-size:22px;
+    background:#fff;box-shadow:0 3px 0 rgba(0,0,0,.2);cursor:pointer}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+  .btn.verde{background:#3ec43e;color:#fff}
+  .btn.vermelho{background:#ff4b4b;color:#fff}
+
+  /* cenário 3D (simulador em modo edição) */
+  #sim{flex:0 1 42%;min-height:120px}
+  #sim iframe, #ws iframe{border:0;width:100%;height:100%;display:block}
+
+  /* paleta de terrenos: tocar escolhe a ferramenta; depois tocar/arrastar no chão pinta */
+  #terrenos{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;padding:8px;background:#fff0dc;
+    border-top:3px solid #f5d2a3;border-bottom:3px solid #f5d2a3;scrollbar-width:none}
+  #terrenos button{flex:0 0 auto;width:56px;height:56px;border-radius:14px;border:3px solid transparent;
+    background:#fff;font-size:26px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:0;padding:0;box-shadow:0 2px 0 rgba(0,0,0,.12)}
+  #terrenos button small{font:600 9px system-ui;color:#665}
+  #terrenos button.sel{border-color:var(--laranja);background:#fff3e0}
+  #terrenos .sep{flex:0 0 2px;background:#f5d2a3;margin:4px 2px}
+
+  /* workspace = o próprio editor em modo cenário */
+  #ws{flex:1 1 auto;min-height:200px}
+</style>
+</head>
+<body>
+
+<header>
+  <button class="btn" id="btnVoltar" title="Voltar para programar">←</button>
+  <h1>Construir cenário</h1>
+  <button class="btn verde" id="btnPlay" title="Testar">▶</button>
+  <button class="btn vermelho" id="btnParar" title="Parar">⏹</button>
+</header>
+
+<div id="sim"><iframe id="simFrame" src="simulador.html?editar=1" title="Cenário 3D"></iframe></div>
+
+<div id="terrenos">
+  <button data-f="" class="sel" title="Mexer a câmera">✋<small>Mover</small></button>
+  <div class="sep"></div>
+  <button data-f="parede">🧱<small>Parede</small></button>
+  <button data-f="estrela">⭐<small>Estrela</small></button>
+  <button data-f="agua">💧<small>Água</small></button>
+  <button data-f="chao_vermelho">🟥<small>Vermelho</small></button>
+  <button data-f="chao_azul">🟦<small>Azul</small></button>
+  <button data-f="chao_verde">🟩<small>Verde</small></button>
+  <div class="sep"></div>
+  <button data-f="apagar">🧽<small>Apagar</small></button>
+  <button id="btnLimpar" title="Apagar todo o cenário">🗑️<small>Limpar</small></button>
+</div>
+
+<div id="ws"><iframe id="wsFrame" src="index.html?modo=cenario" title="Programar reações"></iframe></div>
+
+<script>
+// Esta página só junta as partes: o simulador (editando o cenário) e o editor de blocos.
+// Tudo que um manda para o outro passa por aqui.
+const simFrame = document.getElementById('simFrame'), wsFrame = document.getElementById('wsFrame');
+const paraSim = msg => simFrame.contentWindow?.postMessage(msg, '*');
+const paraWs  = msg => wsFrame.contentWindow?.postMessage(msg, '*');
+
+addEventListener('message', ({ source, data }) => {
+  if (!data?.tipo) return;
+  if (source === simFrame.contentWindow) paraWs(data);       // passo, fim, tocou, vitoria, cenarioMudou...
+  else if (source === wsFrame.contentWindow) paraSim(data);  // executar, reagir, reiniciar...
+});
+
+// ferramentas de terreno
+const botoes = document.querySelectorAll('#terrenos button[data-f]');
+botoes.forEach(b => b.onclick = () => {
+  botoes.forEach(x => x.classList.toggle('sel', x === b));
+  paraSim({ tipo: 'ferramenta', ferramenta: b.dataset.f || null });
+});
+document.getElementById('btnLimpar').onclick = () => {
+  if (confirm('Apagar todo o cenário?')) paraSim({ tipo: 'limparCenario' });
+};
+
+document.getElementById('btnPlay').onclick = () => paraWs({ tipo: 'executarTodos' });
+document.getElementById('btnParar').onclick = () => paraWs({ tipo: 'pararTudo' });
+document.getElementById('btnVoltar').onclick = () => { location.href = 'index.html'; };
+</script>
+</body>
+</html>
