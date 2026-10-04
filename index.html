@@ -26,13 +26,19 @@
   .btn.ligado{background:#5bd65b}
 
   /* simulador */
-  #sim{flex:0 0 38%;min-height:160px;position:relative}
+  #sim{flex:0 1 38%;min-height:60px;position:relative}
+  /* divisor arrastável entre simulador e workspace */
+  #divisor{flex:0 0 auto;height:22px;background:#f0e2b8;display:flex;align-items:center;justify-content:center;
+    touch-action:none;cursor:ns-resize}
+  #divisor::before{content:"";width:56px;height:6px;border-radius:3px;background:#c9b27a}
+  #divisor.ativo{background:#e6d29a}
+  body.redimensionando #simFrame{pointer-events:none}   /* iframe não "rouba" o dedo */
   #sim iframe{border:0;width:100%;height:100%;display:block}
 
   /* workspace: arrastar o fundo navega para qualquer direção (pan próprio, sem scroll nativo) */
   #ws{flex:1 1 auto;min-height:150px;overflow:hidden;position:relative;background:#fff;
     background-image:radial-gradient(#e6dcc0 1.5px,transparent 1.5px);background-size:24px 24px;
-    border-top:4px solid #f0e2b8;touch-action:none;cursor:move}
+    touch-action:none;cursor:move}
   #wsInterno{position:absolute;left:0;top:0;width:0;height:0;will-change:transform;transform-origin:0 0}
   .cadeia{position:absolute;display:flex;align-items:flex-start}
 
@@ -74,6 +80,7 @@
 
 <div id="sim"><iframe id="simFrame" src="simulador.html" title="Simulador 3D"></iframe></div>
 
+<div id="divisor" title="Arraste para mudar o tamanho"></div>
 <div id="ws"><div id="wsInterno"></div></div>
 <div id="paleta"></div>
 
@@ -607,6 +614,36 @@ function aviso(t) {
   a.textContent = t; a.classList.add('mostrar');
   clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.remove('mostrar'), 2200);
 }
+
+// =====================================================================
+// 8. DIVISOR: arrastar a borda muda o tamanho do simulador x workspace
+// =====================================================================
+const sim = document.getElementById('sim'), divisor = document.getElementById('divisor');
+const MIN_SIM = 60, MIN_WS = 150;
+
+function alturaSim(h) {
+  const livre = sim.offsetHeight + ws.offsetHeight;   // espaço dividido entre os dois
+  h = limitar(h, MIN_SIM, livre - MIN_WS);
+  sim.style.flexBasis = h + 'px';
+  aplicarVista();
+  try { localStorage.setItem('alturaSim', h); } catch {}
+}
+
+let divisao = null;
+divisor.addEventListener('pointerdown', e => {
+  divisao = { y0: e.clientY, h0: sim.offsetHeight };
+  try { divisor.setPointerCapture(e.pointerId); } catch {}
+  divisor.classList.add('ativo'); document.body.classList.add('redimensionando');
+});
+divisor.addEventListener('pointermove', e => { if (divisao) alturaSim(divisao.h0 + e.clientY - divisao.y0); });
+const fimDivisao = () => {
+  divisao = null;
+  divisor.classList.remove('ativo'); document.body.classList.remove('redimensionando');
+};
+divisor.addEventListener('pointerup', fimDivisao);
+divisor.addEventListener('pointercancel', fimDivisao);
+
+try { const h = +localStorage.getItem('alturaSim'); if (h) sim.style.flexBasis = h + 'px'; } catch {}
 
 desenhar();
 </script>
