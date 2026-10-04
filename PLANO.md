@@ -42,7 +42,8 @@ que começa com a função da mesma cor e depois volta (máx. 8 níveis, para
 proteger contra função que chama a si mesma).
 
 ## Workspace
-Área livre, sem tamanho nem limite. Cada sequência (cadeia) tem posição própria.
+Folha grande de tamanho fixo (4000×3000 px); a vista e os blocos não passam da borda.
+Cada sequência (cadeia) tem posição própria.
 - Arrastar o fundo move a vista; pinça com 2 dedos (ou Ctrl+roda) dá zoom 0,4x–2x.
 - Arrastar do meio de uma sequência leva o bloco e os seguintes; perto de outra
   sequência ele encaixa (marcador azul); soltar na paleta apaga.
