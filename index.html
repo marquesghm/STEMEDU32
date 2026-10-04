@@ -23,7 +23,18 @@
   .btn{border:0;border-radius:14px;min-width:48px;height:48px;padding:0 12px;font-size:22px;
     background:#fff;box-shadow:0 3px 0 rgba(0,0,0,.2);cursor:pointer}
   .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
-  .btn.ligado{background:#5bd65b}
+  .btn.verde{background:#3ec43e;color:#fff}
+  .btn.vermelho{background:#ff4b4b;color:#fff}
+
+  /* menu hambúrguer */
+  #menu{position:fixed;left:8px;top:62px;z-index:40;display:none;flex-direction:column;gap:4px;padding:6px;
+    background:#fff;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);min-width:200px}
+  #menu.aberto{display:flex}
+  #menu button{display:flex;align-items:center;gap:10px;height:48px;padding:0 12px;border:0;border-radius:10px;
+    background:none;font:16px system-ui;color:var(--texto);cursor:pointer;text-align:left}
+  #menu button:active{background:#fff3c4}
+  #menu button span{width:28px;font-size:20px;text-align:center}
+  #menu button.ligado{background:#d9f7d9}
 
   /* simulador */
   #sim{flex:0 1 38%;min-height:60px;position:relative}
@@ -86,11 +97,15 @@
 <body>
 
 <header>
+  <button class="btn" id="btnMenu" title="Menu">☰</button>
   <h1>STEMEDU32</h1>
-  <button class="btn" id="btnLua" title="Ver código Lua">{ }</button>
-  <button class="btn" id="btnConectar" title="Conectar robô">🔌</button>
-  <button class="btn" id="btnParar" title="Parar">⏹</button>
+  <button class="btn verde" id="btnPlay" title="Executar">▶</button>
+  <button class="btn vermelho" id="btnParar" title="Parar">⏹</button>
 </header>
+<nav id="menu">
+  <button id="btnConectar"><span>🔌</span><b>Conectar robô</b></button>
+  <button id="btnLua"><span>{ }</span><b>Mostrar código</b></button>
+</nav>
 
 <div id="sim"><iframe id="simFrame" src="simulador.html" title="Simulador 3D"></iframe></div>
 
@@ -618,12 +633,32 @@ function executar(cadeia) {
   if (porta) enviarParaRobo(cadeia);
 }
 
+// ▶ do header: executa todas as sequências que começam com Play (de cima para baixo)
+function executarTodos() {
+  const plays = cadeiasPlay();
+  if (!plays.length) { aviso('Coloque um bloco ▶ no começo do programa'); return; }
+  emExecucao = plays.flatMap(c => [{ cmd: 'pular', id: c.blocos[0].id }, ...comandos(c)]);
+  paraSim({ tipo: 'executar', comandos: emExecucao.map(({ cmd, n }) => ({ cmd, n })) });
+  if (porta) enviarParaRobo();
+}
+
+document.getElementById('btnPlay').onclick = executarTodos;
 document.getElementById('btnParar').onclick = () => {
   paraSim({ tipo: 'reiniciar' }); destacar(null);
   if (porta) escreverLinha('parar');
 };
-document.getElementById('btnLua').onclick = () =>
-  document.getElementById('lua').classList.toggle('aberto');
+
+// menu hambúrguer
+const menu = document.getElementById('menu');
+document.getElementById('btnMenu').onclick = () => menu.classList.toggle('aberto');
+document.addEventListener('pointerdown', e => {
+  if (!menu.contains(e.target) && !e.target.closest('#btnMenu')) menu.classList.remove('aberto');
+}, true);
+document.getElementById('btnLua').onclick = () => {
+  const aberto = document.getElementById('lua').classList.toggle('aberto');
+  document.querySelector('#btnLua b').textContent = aberto ? 'Esconder código' : 'Mostrar código';
+  menu.classList.remove('aberto');
+};
 addEventListener('resize', desenhar);
 
 // =====================================================================
@@ -633,6 +668,7 @@ addEventListener('resize', desenhar);
 let porta = null, escritor = null;
 
 document.getElementById('btnConectar').onclick = async () => {
+  menu.classList.remove('aberto');
   if (porta) { await desconectar(); return; }
   if (!('serial' in navigator)) { aviso('Este navegador não suporta Web Serial (use Chrome/Edge)'); return; }
   try {
@@ -640,6 +676,8 @@ document.getElementById('btnConectar').onclick = async () => {
     await porta.open({ baudRate: 115200 });
     escritor = porta.writable.getWriter();
     document.getElementById('btnConectar').classList.add('ligado');
+    document.querySelector('#btnConectar b').textContent = 'Desconectar robô';
+    document.getElementById('btnMenu').classList.add('verde');   // dica visual: robô ligado
     aviso('Robô conectado!');
     lerRespostas();
   } catch (err) { porta = null; aviso('Não conectou: ' + err.message); }
@@ -649,6 +687,8 @@ async function desconectar() {
   try { escritor?.releaseLock(); await porta.close(); } catch {}
   porta = escritor = null;
   document.getElementById('btnConectar').classList.remove('ligado');
+  document.querySelector('#btnConectar b').textContent = 'Conectar robô';
+  document.getElementById('btnMenu').classList.remove('verde');
   aviso('Desconectado');
 }
 
